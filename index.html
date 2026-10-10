@@ -1,0 +1,2134 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>银河通用 · OOBE 开箱引导原型</title>
+<link rel="stylesheet" href="https://miaoda.feishu.cn/fonts/css2?family=Noto+Sans+SC:wght@300;400;500;700&family=Rajdhani:wght@500;600;700&display=swap">
+<style>
+/* ===== 基础重置与设计 token ===== */
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#070b11;            /* 深空蓝黑 */
+  --bg2:#0b1220;           /* 次级背景 */
+  --panel:#0e1726;         /* 面板 */
+  --panel2:#14202f;        /* 面板升 */
+  --line:rgba(120,160,200,.14);
+  --line2:rgba(120,160,200,.28);
+  --txt:#e6eef5;
+  --txt2:#93a4b8;
+  --txt3:#5d7289;
+  --accent:#22d3aa;        /* 电光青：就绪/成功 */
+  --accent2:#38bdf8;       /* 天蓝：进行中 */
+  --warn:#fbbf24;
+  --danger:#f87171;
+  --radius:14px;
+}
+html,body{height:100%}
+body{
+  font-family:"Noto Sans SC",system-ui,-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;
+  background:var(--bg);color:var(--txt);
+  -webkit-font-smoothing:antialiased;
+  overflow-x:hidden;
+}
+/* 背景网格与光晕 */
+.bg-deco{position:fixed;inset:0;z-index:0;pointer-events:none;
+  background:
+    radial-gradient(900px 500px at 15% -10%, rgba(34,211,170,.08), transparent 60%),
+    radial-gradient(800px 500px at 90% 110%, rgba(56,189,248,.07), transparent 60%);
+}
+.bg-deco::after{content:"";position:absolute;inset:0;
+  background-image:linear-gradient(rgba(120,160,200,.045) 1px,transparent 1px),linear-gradient(90deg,rgba(120,160,200,.045) 1px,transparent 1px);
+  background-size:44px 44px;
+  mask-image:radial-gradient(ellipse at center,black 30%,transparent 78%);
+}
+#app{position:relative;z-index:1;min-height:100vh;display:flex;flex-direction:column}
+
+/* ===== 顶部品牌栏 ===== */
+.topbar{
+  display:flex;align-items:center;gap:18px;
+  padding:16px 28px;border-bottom:1px solid var(--line);
+  background:rgba(11,18,32,.7);backdrop-filter:blur(8px);
+  position:sticky;top:0;z-index:20;
+}
+.brand{display:flex;align-items:center;gap:12px;flex:0 0 auto}
+.brand-mark{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;
+  background:linear-gradient(135deg,#0e2a33,#0b1220);border:1px solid rgba(34,211,170,.4)}
+.brand-mark svg{width:20px;height:20px}
+.brand-name{font-weight:700;font-size:15px;letter-spacing:.02em}
+.brand-name small{display:block;font-weight:400;color:var(--txt3);font-size:11px;letter-spacing:.12em}
+.tabs{display:flex;gap:6px;margin-left:auto;background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:4px}
+.tab{border:0;background:transparent;color:var(--txt2);font:500 13px/1 "Noto Sans SC";padding:9px 18px;border-radius:9px;cursor:pointer;transition:.2s;display:flex;align-items:center;gap:7px}
+.tab svg{width:15px;height:15px}
+.tab.on{background:linear-gradient(135deg,rgba(34,211,170,.16),rgba(56,189,248,.14));color:var(--txt);box-shadow:inset 0 0 0 1px rgba(34,211,170,.35)}
+.tagline{margin-left:auto;font-size:11px;color:var(--txt3);letter-spacing:.06em}
+.tagline b{color:var(--accent);font-weight:600}
+
+/* ===== 路由视图 ===== */
+.view{display:none;flex:1}
+.view.on{display:flex;flex-direction:column}
+.stage-wrap{flex:1;display:flex;align-items:center;justify-content:center;gap:34px;padding:34px 28px}
+.stage-center{display:flex;flex-direction:column;align-items:center;gap:14px}
+.stage-note{color:var(--txt2);font-size:12.5px;line-height:1.7;max-width:520px;text-align:center}
+.stage-note b{color:var(--txt)}
+.hint-pill{display:inline-flex;align-items:center;gap:8px;padding:7px 14px;border-radius:999px;
+  background:rgba(56,189,248,.1);border:1px solid rgba(56,189,248,.3);color:var(--accent2);font-size:12px}
+.hint-pill.green{background:rgba(34,211,170,.1);border-color:rgba(34,211,170,.3);color:var(--accent)}
+.hint-pill svg{width:13px;height:13px}
+
+/* ===== 安卓设备壳 ===== */
+android-device{--frame-bg:#0b0f16}
+.app-shell{width:100%;height:100%;display:flex;flex-direction:column;
+  background:
+    radial-gradient(600px 300px at 50% -20%, rgba(34,211,170,.1), transparent 60%),
+    var(--bg2);
+}
+/* 进度轨道 */
+.progress-rail{padding:14px 16px 10px;border-bottom:1px solid var(--line)}
+.progress-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.progress-title{font-size:12px;font-weight:600;letter-spacing:.08em;color:var(--txt2);display:flex;align-items:center;gap:8px}
+.progress-title svg{width:14px;height:14px;color:var(--accent)}
+.progress-count{font:600 12px/1 "Rajdhani","Noto Sans SC";color:var(--accent)}
+.track{display:flex;gap:0;position:relative;height:26px;align-items:center}
+.track-dot{position:relative;flex:1;display:flex;align-items:center}
+.track-dot::before{content:"";flex:1;height:2px;background:var(--line2);margin:0 1px}
+.track-dot:first-child::before{visibility:hidden}
+.track-dot i{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  width:14px;height:14px;border-radius:50%;background:var(--panel2);
+  border:2px solid var(--line2);z-index:2;transition:.25s}
+.track-dot.done i{background:var(--accent);border-color:var(--accent)}
+.track-dot.done::before{background:var(--accent)}
+.track-dot.cur i{width:17px;height:17px;background:transparent;border:2px solid var(--accent2);
+  box-shadow:0 0 0 4px rgba(56,189,248,.14), 0 0 14px rgba(56,189,248,.5)}
+.track-dot.cur::before{background:var(--accent2)}
+.track-dot.fail i{background:var(--danger);border-color:var(--danger)}
+.track-dot i svg{width:8px;height:8px;color:#062019;position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:none}
+.track-dot.done i svg{display:block}
+/* 进度轨道节点可点击 */
+.track-dot.review{cursor:pointer}
+.track-dot.review:hover i{transform:translate(-50%,-50%) scale(1.18);box-shadow:0 0 0 5px rgba(56,189,248,.18)}
+.track-dot.review:hover::after{content:attr(data-tip);position:absolute;top:-26px;left:50%;transform:translateX(-50%);
+  white-space:nowrap;font-size:10px;color:var(--txt);background:var(--panel2);border:1px solid var(--line2);
+  padding:3px 9px;border-radius:7px;z-index:20}
+/* 设置入口 */
+.top-actions{display:flex;align-items:center;gap:8px;margin-left:10px}
+.icon-btn{border:0;background:var(--panel);color:var(--txt2);width:34px;height:34px;border-radius:10px;cursor:pointer;
+  display:inline-flex;align-items:center;justify-content:center;transition:.2s;box-shadow:inset 0 0 0 1px var(--line)}
+.icon-btn:hover{color:var(--accent);box-shadow:inset 0 0 0 1px rgba(34,211,170,.45)}
+.icon-btn svg{width:16px;height:16px}
+.help-btn{display:inline-flex;align-items:center;gap:5px;border:0;background:rgba(56,189,248,.12);
+  color:var(--accent2);font:600 11px/1 "Noto Sans SC";padding:6px 11px;border-radius:8px;cursor:pointer;
+  box-shadow:inset 0 0 0 1px rgba(56,189,248,.3);transition:.2s}
+.help-btn:hover{background:rgba(56,189,248,.22)}
+.help-btn svg{width:12px;height:12px}
+.help-wrap{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+/* 通用弹层 */
+.overlay{position:fixed;inset:0;z-index:90;background:rgba(3,8,16,.66);backdrop-filter:blur(6px);
+  display:none;align-items:center;justify-content:center;padding:24px}
+.overlay.on{display:flex}
+.modal{width:100%;max-width:400px;max-height:82vh;overflow-y:auto;background:var(--bg2);
+  border:1px solid var(--line2);border-radius:18px;padding:22px;box-shadow:0 24px 60px rgba(0,0,0,.5);
+  animation:modalIn .25s ease}
+@keyframes modalIn{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
+.modal h3{font-size:16px;font-weight:700;margin-bottom:4px;display:flex;align-items:center;gap:9px}
+.modal h3 svg{width:17px;height:17px;color:var(--accent)}
+.modal .m-sub{font-size:11.5px;color:var(--txt3);margin-bottom:16px}
+.modal .m-close{position:absolute;top:14px;right:14px;border:0;background:var(--panel2);color:var(--txt2);
+  width:30px;height:30px;border-radius:9px;cursor:pointer;font-size:15px}
+.help-step{display:flex;gap:10px;padding:10px 0;border-top:1px solid var(--line)}
+.help-step:first-of-type{border-top:0}
+.hs-ico{flex:0 0 auto;width:28px;height:28px;border-radius:9px;display:flex;align-items:center;justify-content:center;
+  background:rgba(56,189,248,.12);color:var(--accent2)}
+.hs-ico svg{width:14px;height:14px}
+.hs-body b{font-size:12.5px;color:var(--txt);display:block;margin-bottom:3px}
+.hs-body span{font-size:11.5px;color:var(--txt2);line-height:1.65;display:block}
+.hs-body .hs-link{display:inline-flex;align-items:center;gap:5px;margin-top:6px;font-size:11px;color:var(--accent);cursor:pointer;text-decoration:underline}
+.hs-body .hs-link svg{width:11px;height:11px}
+.confirm-msg{font-size:12.5px;color:var(--txt2);line-height:1.75;margin-bottom:18px}
+.confirm-msg b{color:var(--warn)}
+.m-btn-row{display:flex;gap:10px;justify-content:flex-end}
+.m-btn-row .btn{padding:11px 18px;font-size:13px;border-radius:10px}
+/* 设置面板 */
+.set-row{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-top:1px solid var(--line)}
+.set-row:first-of-type{border-top:0}
+.set-row .s-t b{font-size:13px;color:var(--txt);display:block}
+.set-row .s-t span{font-size:11px;color:var(--txt3);display:block;margin-top:2px}
+.set-row .s-a{font-size:11.5px;color:var(--txt3)}
+.set-link{border:0;background:rgba(56,189,248,.1);color:var(--accent2);font:600 12px/1 "Noto Sans SC";
+  padding:8px 13px;border-radius:9px;cursor:pointer;box-shadow:inset 0 0 0 1px rgba(56,189,248,.3)}
+.set-link:hover{background:rgba(56,189,248,.2)}
+.set-link.danger{background:rgba(248,113,113,.1);color:var(--danger);box-shadow:inset 0 0 0 1px rgba(248,113,113,.35)}
+/* 胸口屏同步条 */
+.chest-sync{display:flex;align-items:center;gap:9px;padding:8px 16px;background:rgba(15,23,42,.55);
+  border-bottom:1px solid var(--line);font-size:11px;color:var(--txt2)}
+.chest-sync .cs-ico{flex:0 0 auto;width:22px;height:22px;border-radius:6px;background:rgba(34,211,170,.14);
+  display:flex;align-items:center;justify-content:center;color:var(--accent)}
+.chest-sync .cs-ico svg{width:13px;height:13px}
+.chest-sync .cs-txt{flex:1;line-height:1.5}
+.chest-sync .cs-txt b{color:var(--txt)}
+.chest-sync .cs-state{flex:0 0 auto;font-size:10px;color:var(--accent2);background:rgba(56,189,248,.12);
+  padding:3px 9px;border-radius:7px}
+/* 退出向导按钮 */
+.exit-btn{display:inline-flex;align-items:center;gap:5px;border:0;background:transparent;color:var(--txt3);
+  font:500 11px/1 "Noto Sans SC";cursor:pointer;padding:5px 8px;border-radius:7px;transition:.2s}
+.exit-btn:hover{color:var(--txt);background:var(--panel2)}
+.exit-btn svg{width:12px;height:12px}
+/* 失败排查 */
+.trouble-card{margin-top:12px;border:1px solid rgba(248,113,113,.35);background:rgba(248,113,113,.07);
+  border-radius:12px;padding:13px 14px}
+.trouble-card .t-title{display:flex;align-items:center;gap:7px;font-size:12px;font-weight:600;color:#fca5a5;margin-bottom:9px}
+.trouble-card .t-title svg{width:13px;height:13px}
+.trouble-item{display:flex;gap:8px;font-size:11.5px;color:var(--txt2);line-height:1.6;padding:4px 0}
+.trouble-item .ti-no{flex:0 0 auto;width:17px;height:17px;border-radius:50%;background:rgba(248,113,113,.18);
+  color:#fca5a5;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center;margin-top:1px}
+/* 未完成标记 */
+.pending-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+.pending-chip{display:inline-flex;align-items:center;gap:5px;font-size:10.5px;color:#fca5a5;
+  background:rgba(248,113,113,.1);border:1px solid rgba(248,113,113,.3);padding:4px 9px;border-radius:8px}
+.pending-chip svg{width:10px;height:10px}
+.rc-pending{border-top:1px solid var(--line);margin-top:12px;padding-top:12px}
+.rc-pending .rp-title{font-size:12px;font-weight:600;color:var(--warn);margin-bottom:4px}
+
+/* APP 内容区 */
+.app-body{flex:1;overflow-y:auto;padding:20px 20px 12px}
+.app-body::-webkit-scrollbar{width:0}
+.screen{display:none;animation:fadeUp .28s ease}
+.screen.on{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+/* 通用APP UI */
+.eyebrow{font-size:10.5px;letter-spacing:.14em;color:var(--accent);font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:6px}
+.eyebrow svg{width:12px;height:12px}
+.h1{font-size:22px;font-weight:700;line-height:1.3;margin-bottom:8px}
+.h2{font-size:16px;font-weight:600;line-height:1.4;margin-bottom:6px}
+.body-copy{font-size:12.5px;line-height:1.75;color:var(--txt2)}
+.body-copy b{color:var(--txt)}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  border:0;border-radius:12px;padding:14px 22px;
+  font:600 14px/1 "Noto Sans SC";cursor:pointer;transition:.18s;
+  background:linear-gradient(135deg,#16a085,#0d9488);color:#03221c}
+.btn:hover{filter:brightness(1.12);transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn.ghost{background:var(--panel2);color:var(--txt);box-shadow:inset 0 0 0 1px var(--line2)}
+.btn.ghost:hover{box-shadow:inset 0 0 0 1px rgba(56,189,248,.5);color:var(--accent2)}
+.btn.blue{background:linear-gradient(135deg,#0284c7,#0369a1);color:#eaf6ff}
+.btn.danger{background:linear-gradient(135deg,#dc2626,#b91c1c);color:#fff}
+.btn.sm{padding:9px 14px;font-size:12.5px;border-radius:9px}
+.btn-row{display:flex;gap:10px;margin-top:18px}
+.btn-row.space{justify-content:space-between}
+
+/* 底部导航栏 */
+.app-footer{padding:10px 20px 16px;border-top:1px solid var(--line);
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:linear-gradient(180deg,transparent,rgba(11,18,32,.6))}
+.foot-status{font-size:11px;color:var(--txt3);display:flex;align-items:center;gap:7px;line-height:1.4}
+.foot-status svg{width:13px;height:13px}
+.foot-status.ok{color:var(--accent)}
+.foot-status.cur{color:var(--accent2)}
+.foot-status b{font-weight:600}
+
+/* 卡片与清单 */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:16px;margin-bottom:12px}
+.check-item{display:flex;align-items:flex-start;gap:11px;padding:12px 0;border-bottom:1px dashed var(--line)}
+.check-item:last-child{border-bottom:0}
+.check-box{width:21px;height:21px;flex:0 0 auto;border-radius:7px;border:2px solid var(--line2);
+  display:grid;place-items:center;margin-top:1px;cursor:pointer;transition:.2s}
+.check-box.on{background:var(--accent);border-color:var(--accent)}
+.check-box.on svg{display:block}
+.check-box svg{width:12px;height:12px;color:#062019;display:none}
+.check-item .ci-body{flex:1}
+.check-item .ci-title{font-size:13.5px;font-weight:600;margin-bottom:3px}
+.check-item .ci-desc{font-size:11.5px;color:var(--txt2);line-height:1.6}
+.ci-step{font:700 12px/1 "Rajdhani";color:var(--accent);margin-right:2px}
+
+/* 自检 */
+.diag-item{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:10px;background:var(--panel);border:1px solid var(--line);margin-bottom:8px;transition:.25s}
+.diag-ico{width:34px;height:34px;flex:0 0 auto;border-radius:9px;background:var(--panel2);display:grid;place-items:center}
+.diag-ico svg{width:18px;height:18px;color:var(--txt3)}
+.diag-item.run .diag-ico svg{color:var(--accent2);animation:pulse 1s infinite}
+.diag-item.ok{border-color:rgba(34,211,170,.4);background:rgba(34,211,170,.06)}
+.diag-item.ok .diag-ico{background:rgba(34,211,170,.14)}
+.diag-item.ok .diag-ico svg{color:var(--accent)}
+.diag-item.err{border-color:rgba(248,113,113,.5);background:rgba(248,113,113,.07)}
+.diag-item.err .diag-ico svg{color:var(--danger)}
+.diag-name{font-size:13px;font-weight:600;flex:1}
+.diag-state{font-size:11px;color:var(--txt3)}
+.diag-item.ok .diag-state{color:var(--accent)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+
+/* 配网（胸口屏 + 手机） */
+.pair-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:14px 0}
+.chest-screen{border-radius:12px;border:1px solid var(--line2);overflow:hidden;background:#04070c}
+.chest-top{display:flex;align-items:center;justify-content:space-between;padding:7px 10px;border-bottom:1px solid rgba(120,160,200,.12);font-size:9.5px;color:var(--txt3);letter-spacing:.08em}
+.chest-top .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.chest-body{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;padding:16px 12px;min-height:150px;text-align:center}
+.chest-body .qr{width:74px;height:74px;background:#fff;border-radius:6px;display:grid;place-items:center}
+.chest-body .qr svg{width:60px;height:60px}
+.chest-msg{font-size:11px;color:var(--txt2);line-height:1.5}
+.chest-msg b{color:var(--txt);font-weight:600}
+.chest-step{font-size:9.5px;color:var(--txt3);letter-spacing:.1em}
+.wifi-list{display:flex;flex-direction:column;gap:6px;width:100%}
+.wifi-item{display:flex;align-items:center;gap:9px;padding:8px 10px;border-radius:8px;background:var(--panel);border:1px solid var(--line);font-size:11.5px;cursor:pointer;transition:.15s}
+.wifi-item:hover{border-color:var(--accent2)}
+.wifi-item .w-ico{color:var(--txt3)}
+.wifi-item .w-ico svg{width:15px;height:15px}
+.wifi-item .w-name{flex:1;font-weight:500}
+.wifi-item .w-lock svg{width:12px;height:12px;color:var(--txt3)}
+.wifi-item.sel{border-color:var(--accent);background:rgba(34,211,170,.08)}
+.input{border:1px solid var(--line2);border-radius:10px;background:var(--panel2);color:var(--txt);
+  padding:13px 14px;font:500 14px/1 "Noto Sans SC";width:100%;outline:none;transition:.2s}
+.input:focus{border-color:var(--accent2);box-shadow:0 0 0 3px rgba(56,189,248,.14)}
+.input::placeholder{color:var(--txt3)}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:11px;color:var(--txt2);margin-bottom:6px;letter-spacing:.04em}
+.field label b{color:var(--txt)}
+.progress-line{height:6px;border-radius:99px;background:var(--panel2);overflow:hidden;margin:12px 0}
+.progress-line i{display:block;height:100%;width:0%;border-radius:99px;transition:.5s ease;
+  background:linear-gradient(90deg,#0d9488,#22d3aa)}
+.progress-line i.blue{background:linear-gradient(90deg,#0369a1,#38bdf8)}
+
+/* 场景卡片 */
+.scene-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.scene-card{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--panel);cursor:pointer;transition:.2s}
+.scene-card:hover{border-color:var(--line2)}
+.scene-card.sel{border-color:var(--accent);background:rgba(34,211,170,.07);box-shadow:0 0 0 1px var(--accent)}
+.scene-card .sc-ico{width:32px;height:32px;border-radius:8px;background:var(--panel2);display:grid;place-items:center;margin-bottom:9px}
+.scene-card .sc-ico svg{width:17px;height:17px;color:var(--accent2)}
+.scene-card .sc-name{font-size:13px;font-weight:600;margin-bottom:3px}
+.scene-card .sc-desc{font-size:10.5px;color:var(--txt2);line-height:1.5}
+.scene-card .sc-tag{display:inline-block;margin-top:8px;font-size:9.5px;color:var(--txt3);letter-spacing:.06em}
+
+/* 定位 */
+.loc-ring{position:relative;width:132px;height:132px;margin:6px auto}
+.loc-ring svg{width:100%;height:100%;transform:rotate(-90deg)}
+.loc-ring .ring-bg{fill:none;stroke:var(--panel2);stroke-width:9}
+.loc-ring .ring-fg{fill:none;stroke:var(--accent);stroke-width:9;stroke-linecap:round;
+  stroke-dasharray:340;stroke-dashoffset:340;transition:1.2s ease}
+.loc-num{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.loc-num .n{font:700 30px/1 "Rajdhani";color:var(--accent)}
+.loc-num .l{font-size:10px;color:var(--txt3);letter-spacing:.1em}
+.loc-ok{display:none;align-items:center;gap:8px;margin-top:12px;color:var(--accent);font-size:12.5px;font-weight:600}
+.loc-ok.on{display:flex}
+
+/* 导航测试 */
+.nav-map{position:relative;border-radius:12px;border:1px solid var(--line2);background:var(--bg2);height:220px;overflow:hidden;margin:12px 0}
+.nav-map .grid-dot{position:absolute;width:1px;height:1px;background:rgba(120,160,200,.14)}
+.nav-robot{position:absolute;width:34px;height:34px;border-radius:50%;background:var(--panel2);
+  border:2px solid var(--accent);display:grid;place-items:center;transition:left 2.2s ease,top 2.2s ease;
+  box-shadow:0 0 18px rgba(34,211,170,.35)}
+.nav-robot svg{width:18px;height:18px;color:var(--accent)}
+.nav-point{position:absolute;width:13px;height:13px;border-radius:50%;background:var(--accent2);
+  border:2px solid #0b1220;box-shadow:0 0 10px rgba(56,189,248,.6)}
+.nav-point::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:1px dashed rgba(56,189,248,.5)}
+.nav-path{position:absolute;height:2px;background:repeating-linear-gradient(90deg,rgba(56,189,248,.8) 0 6px,transparent 6px 12px);
+  border-radius:2px;opacity:0;transition:opacity .3s}
+.nav-path.on{opacity:1}
+.nav-tag{position:absolute;font-size:10px;color:var(--txt2);transform:translateY(15px)}
+.nav-status{position:absolute;top:10px;right:10px;font-size:10.5px;padding:5px 10px;border-radius:99px;
+  background:rgba(56,189,248,.12);border:1px solid rgba(56,189,248,.35);color:var(--accent2)}
+.nav-status.ok{background:rgba(34,211,170,.12);border-color:rgba(34,211,170,.4);color:var(--accent)}
+
+/* 安全配置 */
+.safe-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:12px 0}
+.safe-card{border:1px solid var(--line);border-radius:12px;padding:14px;background:var(--panel)}
+.safe-card .sc-ico{width:30px;height:30px;border-radius:8px;background:var(--panel2);display:grid;place-items:center;margin-bottom:8px}
+.safe-card .sc-ico svg{width:16px;height:16px;color:var(--warn)}
+.safe-card .sc-name{font-size:12.5px;font-weight:600;margin-bottom:3px}
+.safe-card .sc-desc{font-size:10.5px;color:var(--txt2);line-height:1.5;margin-bottom:9px}
+.toggle{position:relative;width:40px;height:22px;border-radius:99px;background:var(--panel2);border:1px solid var(--line2);cursor:pointer;transition:.2s}
+.toggle::after{content:"";position:absolute;left:2px;top:2px;width:16px;height:16px;border-radius:50%;background:var(--txt3);transition:.2s}
+.toggle.on{background:rgba(34,211,170,.3);border-color:var(--accent)}
+.toggle.on::after{left:20px;background:var(--accent);box-shadow:0 0 8px rgba(34,211,170,.6)}
+.estop{width:100%;height:86px;border-radius:14px;border:0;cursor:pointer;font:700 14px/1.3 "Noto Sans SC";
+  background:radial-gradient(circle at 30% 20%, #f87171, #b91c1c);color:#fff;
+  box-shadow:0 8px 20px rgba(185,28,28,.4), inset 0 1px 0 rgba(255,255,255,.25);
+  transition:.15s;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px}
+.estop:active{transform:scale(.97)}
+.estop small{font-size:10px;opacity:.85;font-weight:400}
+.estop.fine{background:radial-gradient(circle at 30% 20%, #4ade80, #16a34a);box-shadow:0 8px 20px rgba(22,163,74,.35), inset 0 1px 0 rgba(255,255,255,.25)}
+
+/* 总结清单 */
+.summary-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0}
+.summary-item{display:flex;align-items:center;gap:9px;padding:10px 12px;border-radius:10px;background:var(--panel);border:1px solid var(--line)}
+.summary-item .s-ico{width:24px;height:24px;flex:0 0 auto;border-radius:7px;background:var(--panel2);display:grid;place-items:center}
+.summary-item .s-ico svg{width:13px;height:13px;color:var(--txt3)}
+.summary-item.ok{border-color:rgba(34,211,170,.35);background:rgba(34,211,170,.05)}
+.summary-item.ok .s-ico svg{color:var(--accent)}
+.summary-item.skip{border-color:rgba(251,191,36,.35);background:rgba(251,191,36,.05)}
+.summary-item.skip .s-ico svg{color:var(--warn)}
+.summary-item .s-name{font-size:11px;font-weight:500;flex:1;line-height:1.3}
+.summary-item .s-st{font-size:9.5px;color:var(--txt3)}
+.summary-item.ok .s-st{color:var(--accent)}
+
+/* 一键开始工作 */
+.golive-steps{margin:12px 0}
+.gl-step{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;background:var(--panel);border:1px solid var(--line);margin-bottom:8px;opacity:.45;transition:.3s}
+.gl-step.run{opacity:1;border-color:rgba(56,189,248,.45)}
+.gl-step.done{opacity:1;border-color:rgba(34,211,170,.4);background:rgba(34,211,170,.06)}
+.gl-num{width:26px;height:26px;flex:0 0 auto;border-radius:50%;display:grid;place-items:center;
+  font:700 12px/1 "Rajdhani";background:var(--panel2);color:var(--txt3);transition:.3s}
+.gl-step.done .gl-num{background:var(--accent);color:#062019}
+.gl-step.run .gl-num{background:rgba(56,189,248,.2);color:var(--accent2);animation:pulse 1s infinite}
+.gl-name{font-size:12.5px;font-weight:600;flex:1}
+.gl-desc{font-size:10.5px;color:var(--txt3);margin-top:2px}
+.gl-state{font-size:10.5px;color:var(--txt3)}
+.gl-step.done .gl-state{color:var(--accent)}
+.gl-step.run .gl-state{color:var(--accent2)}
+.gl-check{display:flex;align-items:center;gap:9px;padding:8px 12px;border-radius:8px;background:var(--panel);border:1px solid var(--line);margin-bottom:6px;font-size:11.5px;opacity:.45}
+.gl-check.done{opacity:1;border-color:rgba(34,211,170,.35);color:var(--txt)}
+.gl-check .gc-ico{width:18px;height:18px;border-radius:6px;background:var(--panel2);display:grid;place-items:center}
+.gl-check.done .gc-ico{background:var(--accent)}
+.gl-check.done .gc-ico svg{color:#062019}
+.gl-check .gc-ico svg{width:11px;height:11px;color:var(--txt3);display:none}
+.gl-check.done .gc-ico svg{display:block}
+
+/* 完成页 */
+.done-hero{text-align:center;padding:26px 0 10px}
+.done-ring{width:104px;height:104px;margin:0 auto 16px;border-radius:50%;display:grid;place-items:center;
+  background:radial-gradient(circle at 35% 30%, rgba(34,211,170,.28), rgba(13,148,136,.12));
+  border:1px solid rgba(34,211,170,.4);box-shadow:0 0 34px rgba(34,211,170,.25)}
+.done-ring svg{width:46px;height:46px;color:var(--accent)}
+.done-title{font-size:20px;font-weight:700;margin-bottom:8px}
+.done-sub{font-size:12.5px;color:var(--txt2);line-height:1.7;margin-bottom:18px}
+.report-card{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin:14px 0;text-align:left}
+.report-card .rc-title{font-size:11px;color:var(--txt3);letter-spacing:.1em;margin-bottom:10px}
+.report-row{display:flex;justify-content:space-between;padding:6px 0;font-size:12px;border-bottom:1px dashed var(--line)}
+.report-row:last-child{border-bottom:0}
+.report-row .k{color:var(--txt2)}
+.report-row .v{font-weight:600}
+
+/* ===== 浏览器窗（地图平台） ===== */
+browser-window{--frame-bg:#0b0f16;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+.map-shell{width:100%;height:100%;display:flex;flex-direction:column;background:var(--bg2);font-size:12.5px}
+.map-topbar{display:flex;align-items:center;gap:10px;padding:9px 12px;background:var(--panel);border-bottom:1px solid var(--line)}
+.map-logo{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:600;color:var(--txt);flex:0 0 auto}
+.map-logo .ml-mark{width:22px;height:22px;border-radius:6px;background:linear-gradient(135deg,#0e2a33,#0b1220);border:1px solid rgba(34,211,170,.4);display:grid;place-items:center}
+.map-logo .ml-mark svg{width:13px;height:13px;color:var(--accent)}
+.map-addr{flex:1;display:flex;align-items:center;gap:8px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font-size:11.5px;color:var(--txt2)}
+.map-addr svg{width:13px;height:13px;color:var(--accent)}
+.map-user{display:flex;align-items:center;gap:8px;font-size:11px;color:var(--txt2)}
+.map-user .av{width:24px;height:24px;border-radius:50%;background:linear-gradient(135deg,#0d9488,#0369a1);display:grid;place-items:center;font-size:10px;font-weight:700;color:#fff}
+.map-main{flex:1;display:flex;min-height:0}
+.map-tools{width:150px;flex:0 0 auto;background:var(--panel);border-right:1px solid var(--line);padding:10px;display:flex;flex-direction:column;gap:4px}
+.map-tool{display:flex;align-items:center;gap:9px;padding:9px 10px;border-radius:9px;border:1px solid transparent;cursor:pointer;font-size:11.5px;color:var(--txt2);transition:.15s;background:transparent;text-align:left;width:100%}
+.map-tool svg{width:15px;height:15px;flex:0 0 auto}
+.map-tool:hover{background:var(--panel2);color:var(--txt)}
+.map-tool.on{background:rgba(34,211,170,.1);border-color:rgba(34,211,170,.35);color:var(--accent)}
+.map-tool.on svg{color:var(--accent)}
+.map-tool .mt-note{font-size:9.5px;color:var(--txt3);display:block;margin-left:24px}
+.tool-sep{height:1px;background:var(--line);margin:6px 2px}
+.map-canvas{flex:1;position:relative;overflow:hidden;background:
+  radial-gradient(500px 300px at 80% 10%, rgba(56,189,248,.05), transparent), var(--bg)}
+.map-canvas svg{position:absolute;inset:0;width:100%;height:100%}
+.map-status{position:absolute;left:14px;bottom:14px;display:flex;gap:8px;z-index:5}
+.map-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;border-radius:99px;font-size:10.5px;
+  background:rgba(11,18,32,.85);border:1px solid var(--line2);color:var(--txt2);backdrop-filter:blur(4px)}
+.map-chip b{color:var(--accent);font-weight:600}
+.map-chip .dot{width:6px;height:6px;border-radius:50%;background:var(--accent);box-shadow:0 0 8px var(--accent)}
+.map-chip.blue .dot{background:var(--accent2);box-shadow:0 0 8px var(--accent2)}
+.map-chip.blue b{color:var(--accent2)}
+.map-hint{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:5;display:flex;align-items:center;gap:8px;
+  padding:8px 16px;border-radius:99px;background:rgba(11,18,32,.9);border:1px solid var(--line2);
+  font-size:11.5px;color:var(--txt2);backdrop-filter:blur(6px);white-space:nowrap}
+.map-hint b{color:var(--accent2);font-weight:600}
+.map-side{width:210px;flex:0 0 auto;background:var(--panel);border-left:1px solid var(--line);padding:12px;overflow-y:auto}
+.side-title{font-size:10.5px;color:var(--txt3);letter-spacing:.1em;margin-bottom:10px}
+.side-row{display:flex;align-items:center;justify-content:space-between;padding:7px 0;font-size:11.5px;border-bottom:1px dashed var(--line)}
+.side-row .k{color:var(--txt2)}
+.side-row .v{font-weight:600;display:flex;align-items:center;gap:5px}
+.side-row .v .swatch{width:9px;height:9px;border-radius:3px;display:inline-block}
+.side-row.warn .v{color:var(--warn)}
+.side-row.ok .v{color:var(--accent)}
+.point-list{margin-top:4px}
+.pt-item{display:flex;align-items:center;gap:8px;padding:6px 8px;border-radius:8px;background:var(--panel2);margin-bottom:5px;font-size:11px}
+.pt-item .p-dot{width:9px;height:9px;border-radius:50%;flex:0 0 auto}
+.pt-item .p-name{flex:1;color:var(--txt2)}
+.pt-item .p-xy{font:600 10px/1 "Rajdhani";color:var(--txt3)}
+.map-footer{display:flex;align-items:center;justify-content:space-between;padding:9px 14px;background:var(--panel);border-top:1px solid var(--line);font-size:11px;color:var(--txt3)}
+.map-footer .mf-right{display:flex;gap:8px;align-items:center}
+.map-footer .btn.sm{padding:7px 13px;font-size:11px}
+
+/* 阶段引导跳转卡 */
+.jump-card{background:linear-gradient(135deg, rgba(56,189,248,.09), rgba(34,211,170,.06));
+  border:1px dashed rgba(56,189,248,.45);border-radius:14px;padding:16px;margin:14px 0;text-align:center}
+.jump-card .jc-ico{width:44px;height:44px;border-radius:12px;margin:0 auto 10px;background:rgba(56,189,248,.14);
+  display:grid;place-items:center;border:1px solid rgba(56,189,248,.4)}
+.jump-card .jc-ico svg{width:22px;height:22px;color:var(--accent2)}
+.jump-card .jc-title{font-size:14px;font-weight:600;margin-bottom:5px}
+.jump-card .jc-desc{font-size:11.5px;color:var(--txt2);line-height:1.6;margin-bottom:12px}
+.jump-card.done{border-color:rgba(34,211,170,.5);background:rgba(34,211,170,.07)}
+.jump-card.done .jc-ico{background:rgba(34,211,170,.16);border-color:var(--accent)}
+.jump-card.done .jc-ico svg{color:var(--accent)}
+
+/* toast */
+.toast{position:fixed;top:76px;left:50%;transform:translateX(-50%) translateY(-20px);z-index:99;
+  display:flex;align-items:center;gap:9px;padding:11px 18px;border-radius:12px;font-size:12.5px;font-weight:500;
+  background:var(--panel2);border:1px solid var(--line2);box-shadow:0 12px 30px rgba(0,0,0,.45);
+  opacity:0;transition:.3s;pointer-events:none}
+.toast.on{opacity:1;transform:translateX(-50%) translateY(0)}
+.toast svg{width:16px;height:16px}
+.toast.ok svg{color:var(--accent)}
+.toast.info svg{color:var(--accent2)}
+.toast.warn svg{color:var(--warn)}
+
+/* 视图切换动画 */
+.view-swap{animation:viewIn .35s ease}
+@keyframes viewIn{from{opacity:0;transform:scale(.985)}to{opacity:1;transform:none}}
+
+/* 响应式 */
+@media (max-width: 980px){
+  .stage-wrap{flex-direction:column;gap:22px;padding:20px 14px}
+  .stage-note{max-width:100%}
+  .tagline{display:none}
+}
+@media (max-width: 640px){
+  .topbar{padding:12px 14px;flex-wrap:wrap}
+  .brand-name{font-size:13px}
+  .tabs{width:100%;margin-left:0}
+  .tab{flex:1;justify-content:center}
+  .pair-grid,.scene-grid,.safe-grid,.summary-grid{grid-template-columns:1fr}
+}
+/* 横屏向导：左侧示意，右侧单步操作 */
+#view-app .stage-wrap{padding:28px 20px;display:block}
+#view-app .stage-center{display:none}
+.landscape-device{width:min(960px,100%);height:540px;margin:auto;border:8px solid #182231;border-radius:26px;overflow:hidden;box-shadow:0 20px 70px rgba(0,0,0,.3)}
+.progress-rail{padding:16px 24px 8px}
+.progress-head{margin-bottom:6px}
+.help-wrap{position:absolute;right:28px;top:14px;gap:12px}
+.progress-rail{position:relative}
+.progress-count{margin-right:190px}
+#chest-sync,.foot-status{display:none}
+.app-body{padding:24px 36px;min-height:0}
+.app-footer{padding:12px 24px;justify-content:flex-end}
+.app-shell.connecting .track,.app-shell.connecting .app-footer,.app-shell.connecting .progress-count{display:none}
+.app-shell.connecting .app-body{display:flex;align-items:center}
+.connect-hero{display:grid!important;grid-template-columns:240px minmax(0,1fr);gap:44px;align-items:center;width:100%;text-align:left}
+.connect-orbit{width:190px;height:190px;display:grid;place-items:center;background:var(--panel2);border-radius:50%;margin:auto}
+.connect-orbit svg{width:84px;height:84px;color:var(--accent2)}
+.connect-hero .h1{font-size:28px;margin-bottom:12px}
+.connect-hero .body-copy{font-size:15px;line-height:1.7}
+.connect-device{display:flex;align-items:center;gap:12px;width:100%;padding:14px;text-align:left;background:var(--panel2);border:1px solid var(--line2);border-radius:12px;color:var(--txt);cursor:pointer;margin-top:12px;min-height:56px}
+.connect-device svg{width:28px;height:28px;color:var(--accent)}
+.connect-actions{display:flex;gap:12px;margin-top:24px}
+.connect-actions .btn{min-height:44px}
+.connect-orbit.searching{animation:connect-pulse 1.5s ease-in-out infinite}
+@keyframes connect-pulse{50%{box-shadow:0 0 0 16px rgba(56,189,248,.08)}}
+@media(max-width:700px){
+  #view-app .stage-wrap{padding:12px 8px}
+  .landscape-device{height:440px;border-width:4px;border-radius:18px}
+  .app-body{padding:18px}
+  .connect-hero{grid-template-columns:120px minmax(0,1fr);gap:20px}
+  .connect-orbit{width:110px;height:110px}
+  .connect-orbit svg{width:54px;height:54px}
+  .connect-hero .h1{font-size:23px}
+  .help-wrap{right:12px}
+  .progress-count{margin-right:160px}
+}
+@media(prefers-reduced-motion:reduce){.connect-orbit.searching{animation:none}}
+
+.device-caption{width:min(1000px,100%);margin:0 auto 12px;display:flex;justify-content:space-between;color:var(--txt2);font-size:12px;gap:12px}
+.device-caption select{background:var(--panel);color:var(--txt);border:1px solid var(--line2);padding:5px;border-radius:6px}
+.landscape-device{position:relative;width:min(1000px,100%);height:min(610px,calc(100vh - 180px));min-height:500px;padding:0 14px 12px 24px;border:3px solid #526071;border-radius:34px;background:#202833;box-shadow:inset 0 0 0 4px #111721,0 20px 70px #0006}
+.device-camera{position:absolute;left:7px;top:50%;width:8px;height:8px;background:#05090d;border:1px solid #465665;border-radius:50%}
+.device-status{height:28px;padding:6px 18px;display:flex;justify-content:space-between;font-size:11px;color:#e6eef5}
+.app-shell{height:calc(100% - 28px);border-radius:12px;overflow:hidden}
+.app-nav{display:flex;gap:24px;padding:10px 24px;border-bottom:1px solid var(--line);flex-shrink:0}
+.app-nav button{border:0;background:none;color:var(--txt2);min-height:44px;font:inherit;font-size:14px;cursor:pointer}
+.app-nav .active{color:var(--accent)}
+.app-shell.connecting .progress-rail{display:none}
+.mobile-field{display:block;margin:16px 0;font-size:14px;color:var(--txt2)}
+.mobile-field .input{display:block;width:100%;margin-top:8px;min-height:44px;font-size:16px}
+.mobile-check{display:flex;align-items:center;gap:10px;margin:16px 0;font-size:14px;color:var(--txt2);min-height:28px}
+.mobile-check input{width:18px;height:18px;accent-color:var(--accent)}
+.form-error{color:var(--danger);font-size:13px;min-height:20px;margin:8px 0}
+.control-layout,.settings-columns{display:grid;grid-template-columns:1fr 1fr;gap:32px;margin-top:16px}
+.mode-buttons{display:flex;flex-wrap:wrap;gap:8px;margin-top:10px}
+.mode-buttons .selected{border-color:var(--accent);color:var(--accent)}
+.control-status{color:var(--accent);font-size:14px}
+.vision-preview{height:150px;background:#050a10;border:1px solid var(--line2);border-radius:12px;display:grid;place-items:center;color:var(--txt2);font-size:13px;margin:12px 0}
+.control-layout details{font-size:13px;color:var(--warn);line-height:1.7}
+.control-layout summary{cursor:pointer;padding:8px 0}
+.app-shell.connecting .app-body:has(.control-layout),.app-shell.connecting .app-body:has(.settings-columns){display:block}
+@media(max-width:700px){.landscape-device{height:520px;padding-left:18px}.connect-hero{grid-template-columns:100px 1fr;gap:14px}.control-layout,.settings-columns{gap:16px}.app-nav{gap:16px;padding:6px 16px}}
+.robot-map-preview{height:230px;margin:14px 0;background:#080f19;border:1px solid var(--line2);border-radius:12px;overflow:hidden}.robot-map-preview svg{width:100%;height:100%}
+
+.topbar .tabs,.topbar .top-actions,.topbar .meta{display:none}
+.app-shell{display:grid;grid-template-columns:minmax(0,1fr);grid-template-rows:54px auto minmax(0,1fr) auto}
+.mobile-header{grid-column:1/-1;grid-row:1;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);gap:12px}
+.mobile-header b{font-size:15px}.mobile-header>div{display:flex;align-items:center;gap:14px}#robot-info{font-size:12px;color:var(--txt2)}
+#mobile-settings{background:var(--panel2);color:var(--txt);border:1px solid var(--line);border-radius:10px;width:44px;height:40px;font-size:22px;cursor:pointer}
+.app-nav{display:none}.progress-rail{grid-column:1;grid-row:2}.app-body{grid-column:1;grid-row:3;overflow:auto}.app-footer{grid-column:1;grid-row:4}
+.app-shell.connecting{grid-template-rows:54px minmax(0,1fr)}.app-shell.connecting .app-body{grid-row:2}
+.app-shell.workspace{grid-template-columns:142px minmax(0,1fr);grid-template-rows:54px minmax(0,1fr)}
+.workspace .app-nav{display:flex;grid-column:1;grid-row:2;flex-direction:column;padding:20px 10px;gap:10px;border-right:1px solid var(--line);border-bottom:0}
+.workspace .app-nav button{text-align:left;padding:0 14px;border-radius:10px;font-size:13px}.workspace .app-nav .active{background:rgba(34,211,170,.1)}
+.workspace .app-body{grid-column:2;grid-row:2;padding:22px;display:block!important}.workspace .control-layout{gap:20px}
+.language-screen{width:min(500px,100%);margin:auto;text-align:center;padding:24px;border:1px solid var(--line2);border-radius:20px;background:var(--panel)}
+.language-screen h2{font-size:22px;margin-bottom:28px}.language-options{display:flex;gap:16px;margin-bottom:34px}.language-options button{flex:1;min-height:110px;border:1px solid var(--line);background:var(--panel2);color:var(--txt2);border-radius:12px;font-size:26px;cursor:pointer}.language-options b{display:block;font-size:15px;margin-top:12px}.language-options .selected{border-color:var(--accent2);color:var(--txt)}.language-screen>.btn{width:70%}
+@media(max-width:700px){.app-shell.workspace{grid-template-columns:110px 1fr}.workspace .app-body{padding:14px}.mobile-header{padding:0 12px}#robot-info{font-size:10px}}
+
+.device-caption{flex-wrap:wrap;align-items:center}
+.robot-home{display:grid;grid-template-columns:42% 1fr;gap:32px;min-height:370px;align-items:center}
+.robot-showcase{position:relative;align-self:stretch;border-radius:20px;background:radial-gradient(ellipse at 50% 45%,#274458 0%,#122334 40%,#0c1420 75%);overflow:hidden;display:flex;flex-direction:column;align-items:center;justify-content:center;border:1px solid var(--line)}
+.robot-showcase>svg{height:270px;width:100%;filter:drop-shadow(0 14px 18px #0006)}
+.online-tag{align-self:flex-start;margin:14px 16px;font-size:11px;color:var(--accent);display:flex;gap:7px;align-items:center}.online-tag i{width:6px;height:6px;background:var(--accent);border-radius:50%}
+.robot-identity{display:flex;flex-direction:column;gap:6px;text-align:center;padding-bottom:20px}.robot-identity b{font-size:18px}.robot-identity span{font-size:12px;color:var(--txt2)}
+.home-kicker{font:600 12px Rajdhani,sans-serif;color:var(--accent2);letter-spacing:3px}.home-content h1{font-size:28px;line-height:1.35;margin:12px 0}.home-content>p{font-size:13px;line-height:1.7;color:var(--txt2)}
+.home-shortcuts{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:24px 0 16px}.home-shortcuts button{min-height:112px;padding:16px;text-align:left;border:1px solid var(--line2);border-radius:14px;background:var(--panel2);color:var(--txt);cursor:pointer;transition:border-color .2s,background .2s}.home-shortcuts button:hover{border-color:var(--accent2);background:#1a3043}.home-shortcuts svg{width:25px;height:25px;color:var(--accent2);display:block;margin-bottom:10px}.home-shortcuts b{font-size:14px;display:block}.home-shortcuts span{font-size:11px;color:var(--txt2);display:block;margin-top:6px}
+.home-go{width:100%;min-height:52px;padding:12px 18px;display:flex;justify-content:space-between;align-items:center;border:0;border-radius:13px;background:#38bdf8;color:#06233a;font-size:15px;font-weight:700;cursor:pointer}.home-go span{font-size:24px}
+.connection-note{display:flex;align-items:center;gap:10px;color:var(--txt2);font-size:12px;line-height:1.7;margin-top:22px}.connection-note svg{width:22px;height:22px;flex-shrink:0;color:var(--accent2)}
+.connect-orbit:has(svg[aria-label="机器人示意图"]){width:240px;height:310px;background:radial-gradient(ellipse,#284358,#0d1928 70%);border-radius:22px}.connect-orbit svg[aria-label="机器人示意图"]{width:230px;height:290px}
+@media(max-width:700px){.robot-home{gap:16px;grid-template-columns:38% 1fr}.home-content h1{font-size:23px}.robot-showcase>svg{height:210px}.home-shortcuts{gap:8px}.home-shortcuts button{padding:12px}.connect-orbit:has(svg[aria-label="机器人示意图"]){width:100px;height:180px}.connect-orbit svg[aria-label="机器人示意图"]{width:100px;height:160px}}
+
+/* 白色 App 界面，设备外壳保留独立边界 */
+:root{--bg:#eef2f7;--bg2:#fff;--panel:#fff;--panel2:#f3f6fa;--line:#e6ebf1;--line2:#d7e0ea;--txt:#1b2b41;--txt2:#65758a;--txt3:#7b899a;--accent:#158365;--accent2:#236edb;--warn:#a3650c;--danger:#d34242}
+.bg-deco{background:radial-gradient(ellipse at top,#e3ebf7,transparent 70%)}.bg-deco::after{display:none}
+.app-shell{background:#fff}.topbar{background:#fff;border-color:var(--line)}.brand-name{color:var(--txt)}
+.btn.blue,.home-go{background:#246cdc;color:#fff}.btn{background:#158365;color:#fff}.btn.ghost{background:#f6f8fb;color:var(--txt);border:1px solid var(--line2)}
+#mobile-settings{background:#f3f6fa}.mobile-header{background:#fff}.app-nav{background:#f7f9fc}.workspace .app-nav .active{background:#e8f0fc;color:#246cdc}
+.language-screen{box-shadow:0 15px 45px #183c6a0c}.language-options .selected{background:#edf4ff}
+.connect-orbit{background:#edf4fc}.connect-orbit:has(.welcome-robot){width:240px;height:300px;background:none;border-radius:20px;overflow:hidden}.welcome-robot{width:100%;height:100%;object-fit:cover;object-position:52% 30%}
+.robot-showcase{background:#fff;border-color:#edf0f5}.home-robot-photo{width:100%;height:270px;object-fit:contain}.robot-home{min-height:350px}.home-content h1{font-size:26px}.home-shortcuts{margin:16px 0}.home-shortcuts button{background:#f4f7fb}.home-shortcuts button:hover{background:#eaf1fb}.home-kicker{color:#246cdc}
+.home-status{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}.home-status>div{padding:12px 14px;border:1px solid var(--line);border-radius:12px}.home-status span{display:block;font-size:11px;color:var(--txt2);margin-bottom:6px}.home-status b{font-size:26px;color:#158365}.home-status small{font-size:13px}.home-status button{border:0;background:none;color:#246cdc;font-size:20px;font-weight:600;padding:5px 0;cursor:pointer}
+.workmode-screen{width:min(600px,100%);margin:auto}.workmode-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:24px 0}.workmode-grid button{min-height:72px;background:#f5f7fa;border:1px solid var(--line2);color:var(--txt);border-radius:12px;font-size:17px;cursor:pointer}.workmode-grid .selected{background:#edf4ff;border-color:#246cdc;color:#246cdc}.workmode-screen>.btn{margin-top:18px;min-width:180px}
+.wifi-name{display:flex;gap:12px;align-items:center;padding:14px;background:#f3f6fa;border-radius:12px;margin-top:18px;font-size:12px;color:var(--txt2)}.wifi-name svg{width:24px;height:24px;color:#246cdc}.wifi-name b{display:block;font-size:17px;color:var(--txt);margin-top:5px}
+.robot-map-preview{background:#e8eef4}.modal{box-shadow:0 24px 60px #162b4a33}
+@media(max-width:700px){.connect-orbit:has(.welcome-robot){width:100px;height:190px}.home-robot-photo{height:220px}.home-status{gap:8px}.home-status>div{padding:10px}.workmode-grid{gap:8px}}
+
+.home-device-status{display:flex;gap:14px;padding:12px 0 0;font-size:11px;color:var(--txt2)}.home-device-status>span{display:flex;align-items:center;gap:6px}.home-device-status b{color:var(--txt3);font-weight:500}.home-device-status svg{width:15px;height:15px}.status-dot{width:7px;height:7px;border-radius:50%;background:#a2adbd}.home-shortcuts{margin:12px 0}.home-shortcuts button{min-height:100px}
+.map-empty{min-height:340px;height:100%;display:flex;align-items:center;justify-content:center;flex-direction:column;text-align:center;gap:16px}.map-empty-icon{width:96px;height:96px;display:grid;place-items:center;border:1px dashed #c5d4e6;background:#f4f8fd;border-radius:24px}.map-empty-icon svg{width:44px;height:44px;color:#94abc6}.map-empty h2{font-size:21px}.map-empty p{font-size:13px;color:var(--txt2)}
+#view-map .stage-wrap{display:block;padding:24px 20px}#view-map .stage-center{display:none}.map-webview{width:min(1000px,100%);height:570px;margin:auto;overflow:hidden;border:3px solid #526071;border-radius:24px;background:#fff;display:flex;flex-direction:column}.webview-header{display:flex;align-items:center;gap:20px;padding:10px 20px;border-bottom:1px solid var(--line);flex-shrink:0}.webview-header b{font-size:14px}.webview-header>span{margin-left:auto;color:var(--txt3);font-size:11px}.map-shell{flex:1;min-height:0;background:#fff}.map-main{min-height:0}.app-shell.connecting .app-body:has(#selfcheck-next){display:block}
+
+.robot-home{position:relative;padding-top:32px}
+.robot-home>.home-device-status{position:absolute;top:0;right:0;padding:0;justify-content:flex-end;gap:20px}
+
+.posture-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin:26px 0}.posture-card{display:flex;flex-direction:column;align-items:flex-start;gap:16px;border:1px solid var(--line2);border-radius:16px;background:#f7f9fc;padding:22px;color:var(--txt);cursor:pointer;min-height:150px}.posture-card svg{width:32px;height:32px;color:#246cdc}.posture-card b{font-size:17px}.posture-card span{font-size:12px;color:var(--txt2)}.remote-entry{display:flex;align-items:center;gap:16px;width:100%;padding:22px;border:1px solid #d4e1f5;border-radius:16px;background:#eef4fd;color:var(--txt);cursor:pointer;text-align:left}.remote-entry>svg{width:34px;height:34px;color:#246cdc}.remote-entry>span{flex:1}.remote-entry small{display:block;margin-top:6px;color:var(--txt2)}
+.app-shell.remote-open{grid-template-columns:1fr}.remote-open .app-nav{display:none}.remote-open .app-body{grid-column:1;padding:14px!important}.remote-title{display:flex;align-items:center;gap:14px;margin-bottom:14px}.remote-title h2{font-size:20px}.remote-title>span{margin-left:auto;font-size:11px;color:var(--txt3)}.remote-grid{display:grid;grid-template-columns:1fr .65fr 1fr;gap:14px}.remote-panel{padding:16px;background:linear-gradient(130deg,#fafbfc,#f0f0f5);border:1px solid #eceef2;border-radius:18px;box-shadow:0 5px 12px #22304408}.remote-panel h3{font-size:14px;margin-bottom:10px}.joint-row{display:grid;grid-template-columns:22px 36px minmax(30px,1fr) 36px 38px;align-items:center;gap:6px;margin:8px 0;font-size:12px}.remote-screen button{cursor:pointer}.joint-row button,.head-pad button,.torso-control button{min-height:36px;border:0;border-radius:10px;background:#fff;box-shadow:0 3px 8px #252b3a0b;font-size:23px;color:#343940}.joint-row input{min-width:0;width:100%;accent-color:#246cdc}.joint-row output{font-size:11px;text-align:right}.grip-row{display:flex;align-items:center;gap:8px;border-top:1px solid #e1e3e9;margin-top:14px;padding-top:14px;font-size:12px}.grip-row b{flex:1}.grip-row button{border:1px solid #e7e7eb;border-radius:20px;background:#fff;padding:9px 12px}.grip-row .selected{background:#246cdc;color:white;border-color:#246cdc}.remote-middle{display:flex;flex-direction:column;gap:14px}.remote-middle .remote-panel{flex:1}.head-pad{display:grid;grid-template-columns:repeat(3,40px);grid-template-rows:repeat(3,40px);gap:7px;justify-content:center}.head-up{grid-column:2}.head-left{grid-column:1;grid-row:2}.head-center{grid-column:2;grid-row:2;background:#246cdc!important;color:white!important}.head-right{grid-column:3;grid-row:2}.head-down{grid-column:2;grid-row:3}.remote-value{text-align:center;color:var(--txt2);font-size:11px;margin-top:8px}.torso-control{display:flex;align-items:center;justify-content:center;gap:10px;flex-direction:column}.torso-control button{width:44px}.torso-control output{font-size:14px}.base-controls{display:flex;align-items:center;gap:14px;border:1px solid #e7e9ee;border-radius:26px;background:#f5f6f9;padding:14px;margin-top:16px}.direction-pad{display:flex;align-items:center;gap:6px}.direction-pad button{border:0;background:#e1e3e8;color:#343940;width:40px;height:40px;border-radius:50%;font-size:20px}.base-options{flex:1;display:flex;align-items:center;justify-content:space-between;gap:12px;font-size:11px}.base-options select{display:block;margin-top:7px;border:1px solid #e2e5ea;background:#fff;padding:9px;border-radius:9px;color:var(--txt)}.base-options p{max-width:220px;color:#c44d38;line-height:1.6}.base-options small{display:block;color:var(--txt2);font-size:10px}.lock-label{display:flex;gap:5px;align-items:center;margin-top:8px}.movement-pad{display:grid;grid-template-columns:repeat(3,32px);gap:3px}.movement-pad button{width:32px;height:32px;font-size:16px}.movement-pad button:first-child{grid-column:2}.movement-pad button:nth-child(2){grid-column:1}.movement-pad button:last-child{grid-column:2}.remote-feedback{font-size:11px;color:var(--txt2);margin:10px 0}
+@media(max-width:700px){.remote-grid{gap:8px;grid-template-columns:1fr .6fr 1fr}.remote-panel{padding:10px}.joint-row{grid-template-columns:18px 28px minmax(20px,1fr) 28px 30px;gap:3px}.head-pad{grid-template-columns:repeat(3,30px);grid-template-rows:repeat(3,36px);gap:4px}.base-controls{flex-wrap:wrap}.base-options p{max-width:150px}.posture-card{padding:16px}}
+
+.demo-device-note{font-size:10px;color:var(--txt3)}.software-card{margin-top:22px;border:1px solid var(--line);border-radius:18px;padding:20px;background:#fff}.software-heading{display:flex;align-items:center;justify-content:space-between}.software-heading h2{font-size:19px}.system-summary{padding:8px 14px;border:1px solid #dfe5ed;border-radius:10px;font-size:12px;color:var(--txt2)}.system-summary.normal{background:#edf8f3;color:#158365;border-color:#cfeadd}.system-summary.error{background:#fff0f0;color:#d34242;border-color:#ffc9c9}.software-note{font-size:11px;color:var(--txt3);margin:10px 0 16px}.system-groups{display:grid;grid-template-columns:1fr 1fr 1fr;gap:20px}.system-group h4{font-size:12px;color:var(--txt2);font-weight:500;margin-bottom:10px}.system-row{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:6px;padding:10px 0;font-size:12px}.system-row>span{display:flex;align-items:center;gap:7px}.system-row b{color:#158365;font-weight:500}.system-dot{width:7px;height:7px;background:#42bd86;border-radius:50%;box-shadow:0 0 0 4px #42bd8617}.system-dot.pending{background:#a2adbd;box-shadow:none}.system-dot.bad{background:#ef7655;box-shadow:none}.system-row:has(.pending) b{color:var(--txt3)}.system-row.fault{background:#fff3ed;border:1px solid #ffcebb;border-radius:10px;padding:10px}.system-row.fault b,.system-row.fault p{color:#d65b38}.system-row p{font-size:11px;line-height:1.7;width:100%}
+.about-heading{display:flex;align-items:center;gap:16px;margin-bottom:20px}.about-heading h2{font-size:22px}.about-layout{display:grid;grid-template-columns:1.15fr 1fr;gap:18px}.about-card{border:1px solid var(--line);border-radius:16px;padding:18px;margin-bottom:16px;background:#f8fafc}.about-card h3{font-size:15px;margin-bottom:14px}.about-row{display:flex;justify-content:space-between;align-items:baseline;gap:10px;padding:9px 0;font-size:12px}.about-row span{color:var(--txt2)}.about-row b{font-weight:500;overflow-wrap:anywhere;text-align:right}.about-robot img{width:100%;height:350px;object-fit:contain}.about-robot p{font-size:11px;color:var(--txt3);line-height:1.7;text-align:center}.device-caption{gap:8px}
+@media(max-width:700px){.system-groups{grid-template-columns:1fr 1fr}.about-layout{grid-template-columns:1fr 1fr}.about-robot{grid-column:2;grid-row:1}.about-robot img{height:280px}}
+
+.app-shell.workspace{grid-template-columns:104px minmax(0,1fr)}
+.app-shell.workspace.remote-open{grid-template-columns:1fr}
+.workspace .app-nav{padding:18px 8px}.workspace .app-nav button{padding:0 12px}
+.robot-home{padding-top:0}
+#header-device-status{padding:0;gap:14px;flex-shrink:0;font-size:11px}
+.mobile-header>div{gap:18px}
+.connect-actions:has(#selfcheck-next){justify-content:center}
+@media(max-width:700px){.app-shell.workspace{grid-template-columns:86px minmax(0,1fr)}.app-shell.workspace.remote-open{grid-template-columns:1fr}.mobile-header{flex-wrap:wrap;height:auto;padding:8px 12px}.mobile-header>div{gap:10px}#header-device-status{gap:8px;font-size:10px}.workspace .app-nav button{padding:0 8px}}
+
+.app-shell.connecting{grid-template-rows:54px 92px minmax(0,1fr)}
+.app-shell.connecting .progress-rail{display:block;grid-row:2}
+.app-shell.connecting .track,.app-shell.connecting .progress-count{display:flex}
+.app-shell.connecting .app-body{grid-row:3}
+.workspace .progress-rail{display:block;grid-column:1/-1;grid-row:2}
+.app-shell.workspace{grid-template-rows:54px 92px minmax(0,1fr)}
+.workspace .app-nav,.workspace .app-body{grid-row:3}
+.progress-rail{padding:10px 16px 12px}.progress-head{margin-bottom:6px}.track{height:48px;align-items:flex-start}.track-dot{height:22px;flex-direction:column;min-width:0}.track-dot::before{position:absolute;top:10px;left:0;right:0}.step-label{margin-top:26px;font-size:9px;line-height:1.4;color:var(--txt2);text-align:center;white-space:nowrap}.track-dot.cur .step-label{color:var(--accent2);font-weight:700}.help-wrap{display:none}.progress-count{margin-right:0}
+.app-shell.remote-open .progress-rail{display:block}.remote-open .app-body{grid-row:3}
+.language-screen{padding:18px}.language-screen h2{margin-bottom:18px}.language-options{margin-bottom:20px}.language-options button{min-height:85px}
+.workmode-grid{margin:16px 0}.workmode-grid button{min-height:56px}.workmode-screen>.btn{margin-top:12px}
+.diag-item{padding:10px;margin-bottom:7px}.guide-completion{padding:36px;text-align:center}
+.robot-home{min-height:330px}.home-robot-photo{height:220px}
+.rail-exit{border:0;background:none;color:var(--txt2);font-size:11px;margin-left:12px;cursor:pointer}
+
+.landscape-device>.progress-rail{height:90px;background:#f8faff;margin-top:8px;border-radius:18px 18px 0 0;padding:9px 12px;border-bottom:1px solid var(--line)}
+.progress-title{display:none!important}.progress-head{justify-content:flex-end;margin:0 0 7px}.progress-count{font-size:11px}
+.app-shell{height:calc(100% - 126px);grid-template-rows:54px minmax(0,1fr) auto}
+.app-shell.connecting,.app-shell.workspace{grid-template-rows:54px minmax(0,1fr)}
+.app-shell .app-body,.app-shell.connecting .app-body,.workspace .app-body,.remote-open .app-body{grid-row:2}
+.workspace .app-nav{grid-row:2}.app-footer{grid-row:3}
+.track{display:grid;grid-template-columns:repeat(9,minmax(0,1fr));gap:5px;height:52px;align-items:stretch}
+.track-dot{height:52px;border:1px solid #e0e7f0;background:#fff;border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;position:relative}
+.track-dot::before,.track-dot.review:hover::after{display:none}.track-dot i,.track-dot.cur i{position:static;transform:none;width:18px;height:18px;border:0;border-radius:5px;background:#edf1f7;color:#6e7d90;font:600 10px/18px sans-serif;text-align:center;box-shadow:none}
+.track-dot i svg{position:static;transform:none;width:10px;height:10px;margin:4px}.track-dot.done i{background:#e4f3ed;color:#158365}.track-dot.cur{border-color:#246cdc;background:#edf4ff}.track-dot.cur i{background:#246cdc;color:#fff}.track-dot.fail i{background:#f0f1f4;color:#8792a1}
+.step-label{margin:0;white-space:normal;font-size:8px;line-height:1.25;text-align:center;max-width:100%}.track-dot.review:hover i{transform:none;box-shadow:none}
+#map-guide-progress .track{height:52px}.device-status{background:#202833}.landscape-device{min-height:560px}
+.app-body:has(#selfcheck-next){padding:20px 32px}.app-body:has(#selfcheck-next) .diag-item{padding:6px 12px;margin-bottom:6px}.app-body:has(#selfcheck-next) .connect-actions{margin-top:8px}.app-body:has(#selfcheck-next) .diag-ico{width:28px;height:28px}
+.in-workspace>.progress-rail{display:none}.in-workspace>.app-shell{height:calc(100% - 36px)}
+.robot-home{grid-template-columns:38% minmax(0,1fr);align-items:stretch;gap:24px;min-height:0}.home-content{display:flex;flex-direction:column;gap:16px}.home-status{display:block;margin:0}.home-status>div{display:flex;align-items:center;justify-content:space-between;padding:10px 16px}.home-status span{margin:0}.home-content .software-card{margin:0;padding:18px;flex:1}.home-content .system-groups{grid-template-columns:1fr 1fr;gap:12px 20px}.home-content .system-row{padding:7px 0}.home-content .system-row.fault{padding:8px}.home-content .software-note{margin:8px 0 12px}.home-content .system-group:last-child{grid-column:1/-1}.robot-showcase{display:flex;flex-direction:column;justify-content:space-between}.home-robot-photo{height:250px;min-height:0}.home-content .software-heading h2{font-size:18px}
+.track{gap:0}.track-dot{border:0;background:none;border-radius:0;overflow:visible}.track-dot.cur{border:0;background:none}.track-dot i,.track-dot.cur i{width:22px;height:22px;border-radius:50%;line-height:22px;z-index:1}.track-dot i svg{margin:6px}.track-dot::before{display:block;content:"";position:absolute;top:13px;left:-50%;width:100%;height:2px;background:#dce4ee;z-index:0;transform:none}.track-dot:first-child::before{display:none}.track-dot.done::before{background:#158365}.step-label{font-size:9px}.track-dot.cur .step-label{color:#246cdc;font-weight:600}
+.landscape-device>.app-shell{height:calc(100% - 36px)}
+.app-shell,.app-shell.connecting{grid-template-rows:54px 90px minmax(0,1fr) auto}
+.app-shell>.progress-rail{grid-column:1/-1;grid-row:2;height:90px;padding:9px 12px;background:#f8faff}
+.app-shell .app-body,.app-shell.connecting .app-body{grid-row:3}.app-shell .app-footer{grid-row:4}
+.app-shell.workspace{grid-template-rows:54px minmax(0,1fr)}.app-shell.workspace>.progress-rail{display:none}.workspace .app-body,.workspace .app-nav,.remote-open .app-body{grid-row:2}
+.app-shell:has(.guide-completion) .app-footer{display:none}.app-body:has(.guide-completion){display:flex;align-items:center;justify-content:center}.guide-completion{width:100%;text-align:center}.guide-completion .connect-actions{justify-content:center;margin-top:28px}.guide-completion .btn{min-width:200px}
+.app-shell:not(.workspace) .mobile-header>div{display:none}
+.workspace .app-nav{align-self:stretch;align-items:stretch;justify-content:flex-start;height:100%;min-height:0;box-sizing:border-box}.workspace .app-nav button{width:100%;flex-shrink:0;text-align:left;display:flex;align-items:center;height:44px}.workspace .app-body{align-self:stretch;min-height:0}.guide-step-actions{display:flex;justify-content:center;gap:12px;margin-top:20px}.guide-step-actions .btn{min-width:120px}.workmode-screen .guide-step-actions{margin-top:24px}
+.app-shell.workspace .app-body,.app-shell.workspace .app-nav{grid-row:2}.app-shell.workspace .app-footer{display:none}
+.app-shell{position:relative}.document-webview{position:absolute;inset:0;z-index:30;background:#fff;display:flex;flex-direction:column;border-radius:inherit;overflow:hidden}.document-webview[hidden]{display:none}.document-webview header{display:flex;align-items:center;gap:16px;padding:12px 20px;border-bottom:1px solid var(--line)}.document-webview header b{font-size:16px}.document-webview iframe{width:100%;flex:1;min-height:0;border:0;background:#fff}.manual-links{display:flex;gap:12px;margin-top:12px}
+.manual-link{margin-left:auto;white-space:nowrap;color:#246cdc;text-decoration:none;font-size:12px;padding:8px}.manual-link:hover{text-decoration:underline}.check-item .ci-body{min-width:0;flex:1}.screen-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:10px}.screen-heading .h1{margin:0}.location-screen{max-width:640px;margin:auto;text-align:center}.location-screen .loc-ring{width:132px;height:132px;margin:24px auto 16px;flex-shrink:0}.loc-ok{justify-content:center}.loc-ok svg{width:20px;height:20px;flex-shrink:0}.app-body:has(.location-screen){display:flex;align-items:center;justify-content:center}
+#header-device-status{display:none}.settings-screen .connect-device{min-height:56px;padding:10px 16px;margin-top:10px}.settings-screen .connect-device small{display:block;color:var(--txt2);margin-top:4px}.language-setting-row select{width:160px;margin-left:auto;padding:8px 12px}.control-choices{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin-top:22px}.control-choices .posture-grid{grid-template-columns:1fr;margin:0;gap:12px}.control-choices .posture-card{min-height:76px;flex-direction:row;align-items:center;padding:16px;gap:14px}.control-choices .posture-card span{margin-left:auto}.control-choices .remote-entry{flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:22px}.control-choices .remote-entry>span{flex:0}.control-choices .remote-entry>svg{width:48px;height:48px}.in-remote>.device-status{display:none}.landscape-device.in-remote>.app-shell{height:100%}.app-shell.workspace.remote-open{grid-template-rows:minmax(0,1fr)}.remote-open>.mobile-header{display:none}.app-shell.workspace.remote-open .app-body{grid-row:1;grid-column:1}
+.version-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 20px;margin-top:18px}.version-row{display:flex;justify-content:space-between;gap:16px;padding:12px 16px;border:1px solid var(--line);border-radius:10px;background:#f7f9fc;font-size:12px}.version-row b{color:var(--txt2);font-weight:500}
+.track-dot:not(.done) i{background:#f8faff;border:2px solid #c7d2e1;box-sizing:border-box}.track-dot.cur:not(.done) i{background:#fff;border-color:#246cdc;box-shadow:0 0 0 4px #246cdc12}.track-dot.done i{background:#e4f3ed;border:0;color:#158365}
+.scenario-grid{grid-template-columns:1fr 1fr}
+.scenario-grid{grid-template-columns:repeat(3,minmax(0,1fr))}.scenario-grid button{font-size:15px}.diagnostic-screen{animation:none}.diagnostic-note{height:24px;min-height:24px;line-height:24px}.diagnostic-screen .diag-item{transition:background .2s,border-color .2s}.posture-card .posture-icon{width:42px;height:56px;flex-shrink:0}
+.remote-panel,.base-controls{background:#f6f8fc;border-color:var(--line2);box-shadow:none}.remote-screen button{color:var(--txt)}.remote-screen input[type=range]{accent-color:#246cdc}.remote-screen .selected,.remote-screen .head-center{background:#246cdc!important;color:#fff!important;border-color:#246cdc}.base-options p{color:var(--txt2)}.remote-screen button:active{background:#dce9ff;box-shadow:inset 0 2px 4px #246cdc25}.remote-screen button:focus-visible{outline:2px solid #246cdc;outline-offset:3px}
+.head-pad,.movement-pad{position:relative;width:140px;height:140px;margin:auto;border-radius:50%;padding:16px;box-sizing:border-box;background:radial-gradient(circle,#edf3fc 52%,#dce5f1 70%,#f9fbff 72%);border:1px solid #d2ddec;box-shadow:inset 0 3px 7px #19395712;display:grid;grid-template-columns:repeat(3,36px);grid-template-rows:repeat(3,36px);gap:0;justify-content:center;align-content:center;flex-shrink:0}
+.head-pad button,.movement-pad button{width:36px;height:36px;min-height:36px;border-radius:5px;background:#fff;color:#3b5d8d;font-size:22px;border:1px solid #dce5f1;box-shadow:0 2px 3px #1c365615;z-index:1}.head-pad .head-center,.movement-pad button:nth-child(3){border-radius:50%;background:#246cdc;color:#fff;box-shadow:0 3px 6px #246cdc30}.movement-pad button:nth-child(1){grid-column:2;grid-row:1}.movement-pad button:nth-child(2){grid-column:1;grid-row:2}.movement-pad button:nth-child(3){grid-column:2;grid-row:2}.movement-pad button:nth-child(4){grid-column:3;grid-row:2}.movement-pad button:nth-child(5){grid-column:2;grid-row:3}
+.rotation-pad{position:relative;width:140px;height:140px;border:1px solid #d2ddec;border-radius:50%;flex-shrink:0;background:radial-gradient(circle,#edf3fc 52%,#dce5f1 70%,#f9fbff 72%);justify-content:space-between;padding:10px;box-sizing:border-box;gap:0}.rotation-pad button{width:34px;height:44px;border:1px solid #dce5f1;border-radius:12px;background:#fff;color:#3b5d8d;z-index:1}.stick-center{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:46px;height:46px;border-radius:50%;display:grid;place-items:center;background:#246cdc;color:#fff;box-shadow:0 4px 8px #246cdc30;font-size:18px}.head-pad button,.direction-pad button{touch-action:none;user-select:none}.remote-value{margin-top:10px}
+/* 工作台急停控制 */
+.emergency-slider{position:relative;width:178px;height:36px;border:1px solid #f1bab4;border-radius:20px;background:#fff1ef;color:#c43e32;flex-shrink:0;user-select:none}
+.emergency-slider>span{display:block;text-align:center;padding-left:30px;font-size:12px;line-height:34px}
+.emergency-slider button{position:absolute;left:3px;top:3px;width:28px;height:28px;padding:0;border:0;border-radius:50%;background:#d94b3f;color:white;font-size:17px;cursor:grab;touch-action:none;transform:translateX(calc(var(--slide,0) * 142px))}
+.emergency-slider button:focus-visible{outline:2px solid #246cdc;outline-offset:3px}
+.emergency-slider.stopped{background:#d94b3f;color:white;border-color:#d94b3f}
+.emergency-slider.stopped>span{padding-left:0;font-weight:600}
+.robot-showcase{position:relative}.emergency-badge{position:absolute;right:16px;top:16px;border-radius:14px;background:#fff1ef;color:#c43e32;padding:5px 10px;font-size:12px;font-weight:600}
+body .posture-card:disabled,body .remote-screen button:disabled{opacity:.45;cursor:not-allowed}
+</style>
+</head>
+<body>
+<div class="overlay" id="mobile-settings-overlay"><div class="modal" role="dialog" aria-modal="true" aria-labelledby="app-settings-title"><h3 id="app-settings-title">设置</h3><label class="mobile-field"><span id="language-setting-label">通用设置 · App 语言设置</span><select id="language-setting" class="input"><option value="zh">简体中文</option><option value="en">English</option></select></label><button class="btn ghost" id="close-mobile-settings" style="float:right" aria-label="Close">×</button></div></div><div class="bg-deco"></div>
+<div id="app">
+
+  <!-- ===== 顶部品牌栏 ===== -->
+  <header class="topbar">
+    <div class="brand">
+      <div class="brand-mark">
+        <svg viewBox="0 0 24 24" fill="none"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z" stroke="#22d3aa" stroke-width="1.6"/><path d="M12 7v10M7 12h10" stroke="#38bdf8" stroke-width="1.6" stroke-linecap="round"/></svg>
+      </div>
+      <div class="brand-name">银河通用机器人<small>OOBE 开箱引导 · 交互原型 v1.0</small></div>
+    </div>
+    <nav class="tabs">
+      <button class="tab on" data-view="app" id="tab-app">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M10.5 5h3M12 17.5v.01" stroke-linecap="round"/></svg>
+        遥控器 APP
+      </button>
+      <button class="tab" data-view="map" id="tab-map">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 010 17M3.5 12h17M12 3.5c3 3.5 3 13.5 0 17M12 3.5c-3 3.5-3 13.5 0 17" stroke-linecap="round"/></svg>
+        地图管理平台
+      </button>
+    </nav>
+    <div class="top-actions">
+      <button class="icon-btn" id="btn-settings" title="系统设置">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v3M12 18.2v3M21.2 12h-3M5.8 12h-3M18.5 5.5L16.4 7.6M7.6 16.4L5.5 18.5M18.5 18.5L16.4 16.4M7.6 7.6L5.5 5.5" stroke-linecap="round"/></svg>
+      </button>
+    </div>
+    <div class="tagline">G1 / G3 开箱即用 · <b>开箱与部署引导</b></div>
+  </header>
+
+  <!-- ===== 视图：遥控器 APP ===== -->
+  <section class="view on" id="view-app">
+    <div class="stage-wrap">
+      <div class="stage-center">
+        <div class="stage-note" id="app-note"></div>
+        <span class="hint-pill" id="app-hint" style="display:none"></span>
+      </div>
+      <div class="device-caption"><span>横屏手机 / 平板 · 交互原型</span><label>系统状态（模拟） <select id="demo-system"><option value="pending">待同步</option><option value="normal">正常</option><option value="error">异常</option></select></label><label>模拟校验结果 <select id="demo-result"><option value="success">成功</option><option value="fail">失败</option></select></label><label>蓝牙权限（模拟） <select id="demo-bluetooth"><option value="off">未开启</option><option value="on">已开启</option></select></label><label>Wi-Fi（模拟） <select id="demo-wifi"><option>Galbot-Office</option><option>Galbot-Lab</option></select></label><label>机器人地图 <select id="demo-map"><option value="yes">已有地图</option><option value="no">无地图</option></select></label></div><div class="landscape-device"><div class="device-camera"></div><div class="device-status"><span>9:41</span><span>Wi-Fi　▰</span></div>
+        <div class="app-shell"><header class="mobile-header"><b id="mobile-title">银河机器人</b><div><div id="header-device-status" class="home-device-status"></div><div id="emergency-control"></div><span id="robot-info"></span><button id="mobile-settings" aria-label="App 设置">⚙</button></div></header>          <div class="progress-rail">
+            <div class="progress-head">
+              <span class="progress-title"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 12a8 8 0 0114.9-3M20 12a8 8 0 01-14.9 3M4 12h6M20 12h-6M4 12l1.5-3M20 12l-1.5 3" stroke-linecap="round" stroke-linejoin="round"/></svg>开箱引导进度</span>
+              <span class="progress-count" id="p-count">第 1 / 9 步</span>
+            </div>
+            <div class="track" id="p-track"></div>
+            <div class="help-wrap" style="margin-top:10px">
+              <button class="help-btn" id="btn-help"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 114.8.8c-.6 1.2-2.3 1.6-2.3 2.9M12 16.5v.01" stroke-linecap="round"/></svg> 怎么办</button>
+              <button class="exit-btn" id="btn-exit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 4H5a2 2 0 00-2 2v12a2 2 0 002 2h4M16 8l4 4-4 4M20 12H9" stroke-linecap="round" stroke-linejoin="round"/></svg> 退出向导</button>
+            </div>
+          </div>
+<nav id="app-nav" class="app-nav" aria-label="App navigation"></nav>
+          <div class="app-body" id="app-body"></div><section class="document-webview" id="document-webview" hidden><header><button class="btn ghost sm" id="document-back">← 返回</button><b id="document-title"></b></header><iframe id="document-frame" title="机器人使用说明"></iframe></section>
+          <div class="app-footer">
+            <div class="foot-status" id="foot-status"></div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <button class="btn ghost sm" id="btn-skip" style="display:none">跳过本步</button>
+              <button class="btn ghost sm" id="btn-prev" style="display:none">上一步</button>
+              <button class="btn sm" id="btn-next">下一步</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===== 视图：地图管理平台 ===== -->
+  <section class="view" id="view-map">
+    <div class="stage-wrap">
+      <div class="stage-center">
+        <div class="stage-note" id="map-note"></div>
+      </div>
+      <div class="map-webview"><header class="webview-header"><button class="btn ghost sm" id="webview-back">← 返回</button><b>机器人地图管理平台</b><span>WebView</span></header>
+        <div id="map-guide-progress" class="progress-rail"></div><div class="map-shell">
+          <div class="map-topbar">
+            <div class="map-logo">
+              <div class="ml-mark"><svg viewBox="0 0 24 24" fill="none"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z" stroke="#22d3aa" stroke-width="1.6"/><path d="M12 7v10M7 12h10" stroke="#38bdf8" stroke-width="1.6" stroke-linecap="round"/></svg></div>
+              地图管理平台
+            </div>
+            <div class="map-user"><div class="av">管</div>admin</div>
+          </div>
+          <div class="map-main">
+            <div class="map-tools" id="map-tools"></div>
+            <div class="map-canvas" id="map-canvas">
+              <svg id="map-svg" viewBox="0 0 720 440" preserveAspectRatio="xMidYMid meet"></svg>
+              <div class="map-hint" id="map-hint" style="display:none"></div>
+              <div class="map-status">
+                <div class="map-chip"><span class="dot"></span>定位正常 <b id="chip-loc">0.96</b></div>
+                <div class="map-chip blue"><span class="dot"></span>地图 <b id="chip-map">未保存</b></div>
+              </div>
+            </div>
+            <div class="map-side" id="map-side"></div>
+          </div>
+          <div class="map-footer">
+            <span id="map-foot-left">模式：查看</span>
+            <div class="mf-right">
+              <button class="btn ghost sm" id="map-btn-reset">重置</button>
+              <button class="btn sm" id="map-btn-save">保存并返回 APP</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="toast" id="toast"></div>
+
+  <!-- 帮助弹层 -->
+  <div class="overlay" id="help-overlay">
+    <div class="modal" style="position:relative;max-width:430px">
+      <button class="m-close" data-close="help">×</button>
+      <h3 id="help-title"></h3>
+      <div class="m-sub" id="help-sub"></div>
+      <div id="help-body"></div>
+    </div>
+  </div>
+
+  <!-- 确认弹层 -->
+  <div class="overlay" id="confirm-overlay">
+    <div class="modal" style="position:relative;max-width:360px">
+      <h3 id="confirm-title"></h3>
+      <div class="confirm-msg" id="confirm-msg"></div>
+      <div class="m-btn-row">
+        <button class="btn ghost" id="confirm-cancel">取消</button>
+        <button class="btn" id="confirm-ok">确认</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 设置弹层 -->
+  <div class="overlay" id="settings-overlay">
+    <div class="modal" style="position:relative;max-width:400px">
+      <button class="m-close" data-close="settings">×</button>
+      <h3><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v3M12 18.2v3M21.2 12h-3M5.8 12h-3M18.5 5.5L16.4 7.6M7.6 16.4L5.5 18.5M18.5 18.5L16.4 16.4M7.6 7.6L5.5 5.5" stroke-linecap="round"/></svg>系统设置</h3>
+      <div class="m-sub">OOBE 开箱引导相关设置</div>
+      <div class="set-row">
+        <div class="s-t"><b>当前进度</b><span id="set-progress">—</span></div>
+        <div class="s-a" id="set-state">—</div>
+      </div>
+      <div class="set-row">
+        <div class="s-t"><b>重新进入 OOBE</b><span>随时可重新进入开箱引导向导</span></div>
+        <button class="set-link" id="set-restart">重新进入</button>
+      </div>
+      <div class="set-row">
+        <div class="s-t"><b>恢复出厂设置</b><span>清除全部 OOBE 状态与进度，回到初始开箱状态</span></div>
+        <button class="set-link danger" id="set-factory">恢复出厂</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- 平台 SDK：设备壳 -->
+<script src="https://sf3-scmcdn-cn.feishucdn.com/obj/feishu-static/miaoda/coding-unpkg-sdk/@lark-apaas/coding-registry-buildless@0.1.22/scripts/android-frame.js"></script>
+
+
+<script>
+/* ============================================================
+   银河通用 OOBE 开箱引导原型
+   模块一：遥控器 APP（Stage 0-12 全流程）
+   模块二：地图管理平台（建图 / 禁行线 / 点位标注）
+   ============================================================ */
+'use strict';
+
+/* ---------- 常量与图标 ---------- */
+const STAGES = [
+  { id:0, name:'物理开箱',   label:'Stage 0' },
+  { id:1, name:'欢迎与初始化', label:'Stage 1' },
+  { id:2, name:'开机自检',   label:'Stage 2' },
+  { id:3, name:'网络配置',   label:'Stage 3' },
+  { id:4, name:'默认设备配置', label:'Stage 4' },
+  { id:5, name:'系统更新',   label:'Stage 5' },
+  { id:6, name:'场景与角色设置', label:'Stage 6' },
+  { id:7, name:'建图引导',   label:'Stage 7' },
+  { id:8, name:'地图编辑',   label:'Stage 8' },
+  { id:9, name:'定位校准',   label:'Stage 9' },
+  { id:10,name:'导航测试',   label:'Stage 10' },
+  { id:11,name:'安全配置',   label:'Stage 11' },
+  { id:12,name:'完成与开始工作', label:'Stage 12' },
+];
+STAGES[13]={id:13,name:'语言切换'};
+STAGES[14]={id:14,name:'运行场景配置'};
+STAGES[2].name='系统自检';STAGES[0].name='开箱检查与开机';STAGES[7].name='建图引导';
+const FLOW=[13,0,3,2,14,7,9,10,12].map(id=>STAGES[id]);
+FLOW.forEach((s,i)=>s.label='第 '+(i+1)+' 步');
+const activeFlow=()=>FLOW;
+const GUIDE_GROUPS=[
+  {name:'开机准备',pages:[13,0]},
+  {name:'网络连接',pages:[3]},
+  {name:'系统配置',pages:[2,14]},
+  {name:'环境部署',pages:[7,9,10]},
+  {name:'完成引导',pages:[12]}
+];
+const activeGroups=()=>GUIDE_GROUPS.filter(group=>appState.runScene!=='数采'||!group.pages.includes(7));
+const stepNumber=()=>FLOW.findIndex(s=>s.id===appState.stage)+1;
+function moveStage(direction=1){const ids=FLOW.filter(s=>appState.runScene!=='数采'||![7,9,10].includes(s.id)).map(s=>s.id);appState.stage=ids[Math.max(0,Math.min(ids.length-1,ids.indexOf(appState.stage)+direction))];}
+/* 每阶段帮助内容（怎么办）：图文/视频教程 + 排查步骤 */
+const HELP = {
+  13:{title:'语言切换',sub:'第 1 步',steps:[{ic:'info',t:'App 语言',d:'选择简体中文或 English，后续可通过设置修改。'}]},
+  14:{title:'运行模式配置',sub:'第 5 步',steps:[{ic:'info',t:'选择模式',d:'采集模式无需建图，跳过定位与导航测试。'}]},
+  0: { title:'开箱遇到问题？', sub:'Stage 0 · 物理开箱', steps:[
+    {ic:'box', t:'配件缺失怎么办？', d:'对照装箱单逐项核对：电池、电源线、遥控器、说明书。缺失请联系售后并拍照记录。', link:'开箱视频教程', url:'#'},
+    {ic:'warn', t:'电池装不进去？', d:'检查电池方向标识，对准卡槽滑入，听到"咔嗒"声即为到位。不要强行按压。', link:null},
+    {ic:'map', t:'放置区域要求', d:'选择平整、空旷（半径≥2m）区域，远离楼梯边缘与玻璃幕墙。', link:null},
+  ]},
+  1: { title:'初始化卡住怎么办？', sub:'Stage 1 · 欢迎与初始化', steps:[
+    {ic:'robot', t:'无法开机？', d:'确认电源连接、开机键长按 3 秒。指示灯不亮请检查电池电量（低于 5% 需先充电）。', link:null},
+    {ic:'gear', t:'语言选错了？', d:'当前阶段可直接点选切换；进入后续阶段后可在系统设置中重新进入 OOBE 修改。', link:null},
+  ]},
+  2: { title:'自检报错怎么处理？', sub:'Stage 2 · 开机自检', steps:[
+    {ic:'warn', t:'自检失败项', d:'查看具体失败模块（传感器/电机/急停/通信）。可点击"重新自检"重试一次；持续失败记录错误码。', link:'自检项说明文档', url:'#'},
+    {ic:'link', t:'通信模块异常', d:'确认天线未被遮挡、无金属物屏蔽。重启机器人后再试，仍失败联系售后并上报错误码。', link:null},
+  ]},
+  3: { title:'配网失败怎么办？', sub:'Stage 3 · 网络配置', steps:[
+    {ic:'wifi', t:'扫描不到设备？', d:'确认机器人已开机；手机蓝牙已开启；两者距离 ≤3m。', link:'配网视频教程', url:'#'},
+    {ic:'warn', t:'连接后无法上网？', d:'按顺序排查：① 确认 WiFi 密码正确；② 仅支持 2.4GHz 网络，5GHz 请到路由器开启双频合并；③ 公司网络需在后台提前加白 MAC。', link:null},
+    {ic:'scan', t:'一直配对失败？', d:'重启手机蓝牙与机器人配网模式后重试；检查蓝牙权限后重试。', link:null},
+  ]},
+  5: { title:'系统更新', sub:'检查更新', steps:[
+    {ic:'cloud',t:'检查更新',d:'点击检查更新查看系统状态；暂时不检查可跳过此步骤。',link:null},
+  ]},
+  6: { title:'场景怎么选？', sub:'Stage 6 · 场景与角色设置', steps:[
+    {ic:'cart', t:'业务场景说明', d:'零售门店：货物取送；工业产线：物料搬运；酒店迎宾：导览交互。后续可在系统设置中修改场景。', link:'场景配置文档', url:'#'},
+    {ic:'gear', t:'参数不确定？', d:'均可先使用默认参数，部署后按实际业务在管理平台中调整。', link:null},
+  ]},
+  7: { title:'建图不成功怎么办？', sub:'Stage 7 · 建图引导', steps:[
+    {ic:'map', t:'建图区域太小？', d:'遥控机器人沿墙完整走一遍工作区域，转弯处放慢速度，避免遗漏角落。', link:'建图操作指南', url:'#'},
+    {ic:'warn', t:'建图中断？', d:'确认电量充足（≥30%）、网络稳定；中断后可在地图平台"继续建图"续建。', link:null},
+  ]},
+  8: { title:'地图编辑疑问', sub:'Stage 8 · 地图编辑', steps:[
+    {ic:'line', t:'禁行线怎么画？', d:'选择"禁行线"工具，点击地图上两个点即可画一条禁行线，多段可画多条。', link:'禁行线示例图', url:'#'},
+    {ic:'pin', t:'点位标在哪？', d:'Home 点应靠近充电桩与通道交汇处；取货/放置点对准货架中心线。', link:null},
+  ]},
+  9: { title:'定位不准怎么办？', sub:'Stage 9 · 定位校准', steps:[
+    {ic:'nav', t:'定位分偏低？', d:'将机器人推到已知特征点（如 Home 点）执行"重新定位"；确认地图与当前环境一致（无大规模变动）。', link:'定位校准视频', url:'#'},
+    {ic:'map', t:'环境变化了？', d:'货架、墙体位置变化会降低定位分，建议重新建图后再校准。', link:null},
+  ]},
+  10:{ title:'导航测试失败？', sub:'Stage 10 · 导航测试', steps:[
+    {ic:'nav', t:'无法到达点位？', d:'检查路径上是否有禁行线遮挡、障碍物变动；确认点位在可通行区域内。', link:null},
+    {ic:'warn', t:'避障异常？', d:'确认传感器无遮挡、安全监控区未误触发；在管理平台查看实时传感器状态。', link:'排查工具', url:'#'},
+  ]},
+  11:{ title:'安全配置疑问', sub:'Stage 11 · 安全配置', steps:[
+    {ic:'estop', t:'急停如何测试？', d:'按下急停按钮，机器人应立即制动并报警；复位后状态恢复。建议测试 2 次确认回路稳定。', link:'安全操作手册', url:'#'},
+    {ic:'warn', t:'安全区误触发？', d:'安全监控区范围过大可能误报，按实际人员通道调整区域边界。', link:null},
+  ]},
+  12:{ title:'开始工作不成功怎么办？', sub:'Stage 12 · 完成与开始工作', steps:[
+    {ic:'flash', t:'一键开始工作失败？', d:'按部署报告逐项核对：地图已启用、定位>0.9、点位已标注、网络正常、电量>20%、急停已释放。', link:null},
+    {ic:'done', t:'未完成步骤', d:'汇总中如有跳过/未完成步骤，可返回对应阶段补齐后再开始工作；或点击"跳过开始工作动画"先查看流程效果。', link:null},
+  ]},
+};
+const ICO = {
+  check:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5 10-11"/></svg>',
+  box:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3.5 8L12 3.5 20.5 8v8L12 20.5 3.5 16V8z"/><path d="M3.5 8L12 12.5 20.5 8M12 12.5V20.5" stroke-linejoin="round"/></svg>',
+  wifi:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2.5 9a13 13 0 0119 0M5.5 12.5a9 9 0 0113 0M8.5 16a5 5 0 017 0"/><circle cx="12" cy="19.5" r="1" fill="currentColor" stroke="none"/></svg>',
+  lock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="10.5" width="14" height="9" rx="2"/><path d="M8 10.5V7.8a4 4 0 018 0v2.7"/></svg>',
+  robot:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="5" y="8" width="14" height="9" rx="3"/><circle cx="12" cy="4.5" r="2"/><path d="M8.5 12.5h.01M15.5 12.5h.01" stroke-linecap="round" stroke-width="2.4"/><path d="M9.5 17v2M14.5 17v2" stroke-linecap="round"/></svg>',
+  map:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 4L4 6v14l5-2 7 2 4-2V4l-4 2-7-2z" stroke-linejoin="round"/><path d="M9 4v14M16 6v14"/></svg>',
+  pin:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21s7-5.5 7-11a7 7 0 10-14 0c0 5.5 7 11 7 11z" stroke-linejoin="round"/><circle cx="12" cy="10" r="2.6"/></svg>',
+  line:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 19L19 4M8 19l11-11M12 19l7-7" stroke-linecap="round" stroke-dasharray="1 3"/></svg>',
+  warn:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3.5L2.5 20h19L12 3.5z" stroke-linejoin="round"/><path d="M12 9.5v5M12 17.5v.01" stroke-linecap="round"/></svg>',
+  estop:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M12 5.5a6.5 6.5 0 100 13 6.5 6.5 0 000-13zM12 2v3.5M12 18.5V22" stroke-linecap="round"/></svg>',
+  gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v3M12 18.2v3M21.2 12h-3M5.8 12h-3M18.5 5.5L16.4 7.6M7.6 16.4L5.5 18.5M18.5 18.5L16.4 16.4M7.6 7.6L5.5 5.5" stroke-linecap="round"/></svg>',
+  home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 10.5L12 4l8 6.5V20h-5.5v-5.5h-5V20H4v-9.5z" stroke-linejoin="round"/></svg>',
+  flash:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M13 2L5 13.5h6L11 22l8-11.5h-6L13 2z" stroke-linejoin="round"/></svg>',
+  cart:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 5h2l2.4 11h9.2L21 8H7.2" stroke-linejoin="round"/><circle cx="9.5" cy="20" r="1.6"/><circle cx="16.5" cy="20" r="1.6"/></svg>',
+  scan:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M8 3.5H5a1.5 1.5 0 00-1.5 1.5v3M16 3.5h3A1.5 1.5 0 0120.5 5v3M3.5 16v3A1.5 1.5 0 005 20.5h3M16 20.5h3a1.5 1.5 0 001.5-1.5v-3M4 12h16"/></svg>',
+  cloud:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M7 18a4.5 4.5 0 110-9 5.5 5.5 0 0110.7 1.6A4 4 0 0117.5 18H7z" stroke-linejoin="round"/></svg>',
+  done:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a10 10 0 100 20 10 10 0 000-20z"/><path d="M8 12.5l2.6 2.6L16 9.5" stroke-linecap="round" stroke-linejoin="round"/></svg>',
+  nav:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l3 6.5 6.5 3-6.5 3L12 21l-3-6.5-6.5-3 6.5-3L12 2z" stroke-linejoin="round"/></svg>',
+  link:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 14a4 4 0 005.6 0l3-3a4 4 0 10-5.6-5.6l-1.6 1.6"/><path d="M14 10a4 4 0 00-5.6 0l-3 3a4 4 0 105.6 5.6l1.6-1.6" stroke-linecap="round"/></svg>',
+  back:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg>',
+  refresh:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M20 11a8 8 0 10-.7 3.5M20 4.5V11h-6.5" stroke-linejoin="round"/></svg>',
+  info:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8v.01" stroke-linecap="round"/></svg>',
+};
+
+/* ---------- APP 状态 ---------- */
+const appState = {
+  workMode:null,
+  runScene:null,
+  stage: 13,
+  done: new Array(15).fill(false),   // 阶段是否完成
+  skip: new Array(15).fill(false),   // 阶段是否跳过
+  lang: 'zh',
+  unbox: [false,false,false,false],
+  diag: [false,false,false,false],
+  net: { paired:false, ssid:'', pwd:'', step:0, fallback:false, connected:false, failed:false },
+  device: { paired:true, logged:true, activated:true },
+  update: { found:false, dl:0, installing:false },
+  scene: null,
+  mapStage: { built:false, edited:false },
+  loc: 0,
+  nav: { done:false },
+  safe: { zone:false, speed:false, estop:false, estopPressed:false },
+  golive: { checks:new Array(6).fill(false), steps:new Array(5).fill(false), finished:false, tested:false },
+  fin: false,
+};
+
+/* ---------- DOM 引用 ---------- */
+const $ = s => document.querySelector(s);
+const bodyEl = $('#app-body'), trackEl = $('#p-track'), footEl = $('#foot-status');
+const noteEl = $('#app-note'), hintEl = $('#app-hint'), countEl = $('#p-count');
+const btnPrev = $('#btn-prev'), btnNext = $('#btn-next'), btnSkip = $('#btn-skip');
+let toastTimer = null;
+
+/* 启动连接状态仅在本次打开期间有效，保存的业务进度在连接后恢复。 */
+const WORK_MODES=['工作','休眠','部署','充电','摇操','采集'];
+const WORK_MODE_EN=['Work','Sleep','Deployment','Charging','Teleoperation','Collection'];
+class PostureIcon {
+  static draw(pose){
+    const arms=['M17 26 20 35 24 32 M31 26 28 35 24 32','M17 26 13 37 13 45 M31 26 35 37 35 45','M17 26 12 32 22 28 M31 26 36 32 26 28'][pose];
+    const body=pose===0?'M20 37 18 46 23 52 M28 37 30 46 25 52':'M20 37 20 52 M28 37 28 52';
+    return `<svg class="posture-icon" viewBox="0 0 48 64" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="18" y="8" width="12" height="13" rx="5"/><path d="M21 14h1m4 0h1M24 21v3"/><rect x="17" y="24" width="14" height="13" rx="4" fill="#e8f0ff"/><path d="${arms} ${body}M17 54h6m2 0h6"/><circle cx="17" cy="26" r="2"/><circle cx="31" cy="26" r="2"/></svg>`;
+  }
+}
+class EmergencyStop {
+  constructor(){this.stopped=false;}
+  mount(visible){
+    const host=$('#emergency-control'),t=(zh,en)=>robotConnection.t(zh,en);
+    host.hidden=!visible;
+    if(!visible){host.innerHTML='';return;}
+    host.innerHTML=`<div class="emergency-slider ${this.stopped?'stopped':''}"><span>${t(this.stopped?'急停中':'滑动急停 →',this.stopped?'Emergency stopped':'Slide to stop →')}</span>${this.stopped?'':`<button type="button" role="slider" aria-label="${t('滑动急停','Slide to emergency stop')}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">→</button>`}</div>`;
+    const track=host.firstElementChild,handle=track.querySelector('button');
+    if(!handle)return;
+    let value=0,start=0,pointer=null;
+    const set=v=>{value=Math.max(0,Math.min(100,v));track.style.setProperty('--slide',value/100);handle.setAttribute('aria-valuenow',Math.round(value));};
+    const finish=()=>{if(value>=95)this.activate();else set(0);};
+    handle.onpointerdown=e=>{if(pointer!==null||e.button!==0)return;e.preventDefault();pointer=e.pointerId;start=e.clientX;handle.setPointerCapture(pointer);};
+    handle.onpointermove=e=>{if(e.pointerId===pointer)set((e.clientX-start)/(track.clientWidth-handle.offsetWidth-6)*100);};
+    handle.onpointerup=e=>{if(e.pointerId!==pointer)return;pointer=null;finish();};
+    handle.onpointercancel=handle.onlostpointercapture=()=>{pointer=null;set(0);};
+    handle.onkeydown=e=>{if(!['ArrowRight','ArrowLeft','Home','End','Enter',' '].includes(e.key))return;e.preventDefault();if(['Enter',' '].includes(e.key)){finish();return;}set(e.key==='End'?100:e.key==='Home'?0:value+(e.key==='ArrowRight'?10:-10));};
+    handle.onblur=()=>{if(pointer===null)set(0);};
+  }
+  activate(){
+    if(this.stopped)return;
+    this.stopped=true;robotConnection.enabled=false;robotConnection.visual=false;
+    renderStage();toast(robotConnection.t('机器人急停中（模拟）','Robot emergency stopped (simulated)'),'warn');
+  }
+  lockControls(){
+    if(!this.stopped)return;
+    bodyEl.querySelectorAll('[data-posture],[data-mode],[data-workmode],#save-operating-mode,#enable-control,#send-action,#toggle-vision,[data-joint],[data-angle],[data-grip],[data-head],[data-height],[data-base],#angular-speed,#linear-speed,#direction-lock').forEach(el=>{
+      el.disabled=true;
+      ['onclick','oninput','onpointerdown','onkeydown','onpointerup','onkeyup','onblur'].forEach(event=>{el[event]=null;});
+    });
+    const feedback=$('#remote-feedback');
+    if(feedback)feedback.textContent=robotConnection.t('急停中 · 动作控制已禁用（模拟）','Emergency stopped · Motion controls disabled (simulated)');
+  }
+}
+const emergencyStop=new EmergencyStop();
+
+class RobotConnection {
+  constructor(){ this.en=false; this.mode='站立';this.remote={left:[45,12,-5,90,0,15,0],right:[45,12,-5,90,0,15,0],height:.85,head:[0,0],leftGrip:'张开',rightGrip:'张开'}; this.reset(); }
+  reset(){ clearTimeout(this.timer); this.phase='language'; this.ready=false; this.robot=null; this.linked=false; this.page='connect'; this.visual=false; this.voice=false; this.enabled=false; }
+  t(zh,en){ return this.en?en:zh; }
+  set(phase){
+    clearTimeout(this.timer);this.phase=phase;
+    if(this.page==='connect'){appState.stage=phase==='language'?13:phase==='selfcheck'?2:phase==='workmode'||phase==='connected'?14:3;}
+    if(phase==='selfcheck'){appState.diag=[false,false,false,false];appState.done[2]=false;}
+    renderStage();
+    if(phase==='selfcheck')this.runDiagnostics(0);
+  }
+  runDiagnostics(index){
+    this.timer=setTimeout(()=>{
+      if(this.phase!=='selfcheck')return;
+      appState.diag[index]=true;
+      if(index===3){appState.done[2]=true;saveProgress();}
+      const row=bodyEl.querySelector(`[data-diag="${index}"]`);
+      if(row){row.classList.add('ok');row.querySelector('.diag-state').textContent='正常';}
+      if(index===3){bodyEl.querySelector('.diagnostic-screen .h1').textContent='系统自检完成';bodyEl.querySelector('.diagnostic-note').textContent='';$('#selfcheck-next').disabled=false;renderTrack();}
+      if(index<3)this.runDiagnostics(index+1);
+    },650);
+  }
+  search(){ this.set('searching'); this.timer=setTimeout(()=>this.set('results'),1400); }
+  connect(name){ this.robot=name;appState.net.ssid=$('#demo-wifi').value;this.set('wifi'); }
+  field(id,label,type='password'){ return `<label class="mobile-field">${label}<input id="${id}" class="input" type="${type}" autocomplete="off" required></label>`; }
+  render(){
+    const t=(zh,en)=>this.t(zh,en), phase=this.phase;
+    $('.app-shell').classList.add('connecting');
+    $('.progress-title').textContent=t('开箱引导进度','Setup progress');
+    let html='';
+    if(this.page==='connect' && phase==='language'){
+      html=`<div class="language-screen"><h2>${t('请选择语言','Choose language')}</h2><div class="language-options"><button data-language="zh" class="${!this.en?'selected':''}">◎<b>简体中文</b></button><button data-language="en" class="${this.en?'selected':''}">◎<b>English</b></button></div><button class="btn blue" id="language-next">${t('下一步','Next')}</button></div>`;
+    }else if(this.page==='connect' && phase==='selfcheck'){
+      html=screenDiag()+`<div class="connect-actions guide-step-actions"><button class="btn ghost" id="selfcheck-prev">${t('上一步','Previous')}</button><button class="btn blue" id="selfcheck-next" ${!appState.diag.every(Boolean)?'disabled':''}>${t('下一步','Next')}</button></div>`;
+    }else if(this.page==='connect' && phase==='workmode'){
+      html=`<div class="workmode-screen"><div class="h1">${t('设置机器人运行场景','Set robot scenario')}</div><p class="body-copy">${t('请选择本次开箱引导的运行场景。','Choose a scenario for this setup guide.')}</p><div class="workmode-grid scenario-grid">${['标准','数采','零售商店','零售商店VLA','前置仓'].map((scene,i)=>`<button data-run-scene="${scene}" class="${appState.runScene===scene?'selected':''}">${t(scene==='零售商店VLA'?scene:scene+'场景',['Standard','Data collection','Retail store','Retail store VLA','Fulfillment center'][i])}</button>`).join('')}</div><p class="body-copy">${appState.runScene==='数采'?t('数采场景跳过引导中的建图、定位校准与导航测试；进入首页后仍可查看与管理地图。','Collection skips mapping, calibration and navigation tests during setup. Maps remain available in the workspace.'):''}</p><div class="connect-actions guide-step-actions"><button class="btn ghost" id="workmode-prev">${t('上一步','Previous')}</button><button class="btn blue" id="confirm-workmode" ${!appState.runScene?'disabled':''}>${t('下一步','Next')}</button></div></div>`;
+    }else if(this.page==='connect'){
+      const content={
+        intro:[t('连接机器人','Connect robot'),t('手机连接 Wi-Fi，并开启蓝牙权限。','Connect your phone to Wi-Fi and allow Bluetooth access.')],
+        searching:[t('正在搜索机器人','Searching for robots'),t('请确认机器人已开机。','Ensure the robot is powered on.')],
+        results:[t('选择机器人','Select robot'),t('点击需要连接的设备。','Choose the device to connect.')],
+        wifi:[t('输入 Wi-Fi 密码','Wi-Fi password'),t('请输入手机当前连接 Wi-Fi 的密码。','Enter the password of the Wi-Fi your phone is connected to.')],
+        checking:[t('正在校验','Validating'),t('请稍候，保持设备连接。','Please wait and keep the device connected.')],
+        connected:[t('机器人连接成功','Robot connected'),t('可以进入机器人控制，或继续开箱引导。','Open robot control or continue onboarding.')]
+      }[phase];
+      html=`<div class="screen on connect-hero"><div class="connect-orbit ${['searching','checking'].includes(phase)?'searching':''}">${phase==='connected'?ICO.done:phase==='intro'?'<img class="welcome-robot" src="assets/robot-welcome.jpg" alt="银河机器人">':ICO.robot}</div><div><div class="h1" role="status">${content[0]}</div><div class="body-copy">${content[1]}</div>
+      ${phase==='intro'?`<div class="connection-note">${ICO.wifi}<span>${t('保持手机 Wi-Fi 连接，搜索时需使用蓝牙。','Keep Wi-Fi connected. Bluetooth is required to discover robots.')}</span></div><button class="btn blue" id="start-search" style="margin-top:24px">${t('连接机器人','Connect robot')} <span>→</span></button>`:''}
+      ${phase==='results'?`<button class="connect-device" id="select-robot">${ICO.robot}<b>Galbot-G1-0826</b><span style="margin-left:auto">${t('连接','Connect')}</span></button><button class="btn ghost" id="rescan" style="margin-top:16px">${t('重新搜索','Search again')}</button>`:''}
+      ${phase==='wifi'?`<form id="connect-form"><div class="wifi-name">${ICO.wifi}<span>${t('当前 Wi-Fi','Current Wi-Fi')}<b>${appState.net.ssid||'Galbot-Office'}</b></span></div>${this.field('connection-password',t('当前 Wi-Fi 密码','Current Wi-Fi password'))}<p class="form-error" id="form-error" role="alert"></p><button class="btn blue">${t('校验并继续','Validate and continue')}</button></form>`:''}
+      ${phase==='searching'?`<button class="btn ghost" id="cancel-search" style="margin-top:20px">${t('取消','Cancel')}</button>`:''}
+      ${phase==='connected'?`<div class="connect-actions"><button class="btn blue" id="open-control">${t('退出引导，直接操作','Exit guide and operate')}</button><button class="btn ghost" id="continue-oobe">${t('继续开箱引导','Continue onboarding')}</button></div>`:''}</div></div>`;
+    }else if(this.page==='mode-settings'){
+      html=`<div class="workmode-screen"><div class="h1">${t('设置运行模式','Operating mode')}</div>${this.workModeOptions()}<button class="btn blue" id="save-operating-mode">${t('完成','Done')}</button></div>`;
+    }else if(this.page==='home'){
+      html=`<div class="robot-home"><div class="robot-showcase">${emergencyStop.stopped?`<span class="emergency-badge" role="status">${t('急停中','Emergency stopped')}</span>`:''}<span class="online-tag"><i></i>${t('机器人已连接','Robot connected')}</span><img class="home-robot-photo" src="assets/robot-home.png" alt="银河机器人"><div class="robot-identity"><b>${this.robot}</b><span>${t('型号','Model')} G1 · IP 192.168.0.23</span><small class="demo-device-note">${t('IP 为演示数据','Demo IP address')}</small></div></div><div class="home-content"><div class="home-status"><div><span>${t('当前运行模式','Operating mode')}</span><button id="change-workmode">${this.workModeLabel()} ▾</button></div></div>${this.softwareStatus()}</div></div>`;
+    }else if(this.page==='control'){
+      html=`<div class="screen on"><div class="h1">${t('控制','Control')}</div><p class="body-copy">${t('选择预设姿态，或进入整机遥控。','Choose a preset posture or open whole-body control.')}</p><div class="control-choices"><div class="posture-grid">${['打包姿态','站立姿态','手举胸前'].map((name,i)=>`<button data-posture="${name}" class="posture-card">${PostureIcon.draw(i)}<b>${t(name,['Packing','Standing','Hands in front of chest'][i])}</b><span>${t('切换姿态','Switch posture')} →</span></button>`).join('')}</div><button class="remote-entry" id="open-remote">${ICO.nav}<span><b>${t('整机遥控','Whole-body control')}</b><small>${t('双臂 · 头部 · 躯干 · 底盘','Arms · Head · Torso · Base')}</small></span><b>→</b></button></div><p class="body-copy" role="status" id="posture-status" style="margin-top:16px">${this.posture?t('当前姿态（模拟）：','Current posture (simulated): ')+this.posture:''}</p></div>`;
+    }else if(this.page==='remote'){
+      html=this.remoteScreen();
+    }else if(this.page==='map'){
+      if(appState.mapStage.built||MAP.built){renderMapCanvas();html=`<div class="screen on"><div class="screen-heading"><div class="h1">${t('机器人地图','Robot map')}</div><button class="btn ghost sm" id="work-map">${t('管理地图','Manage map')}</button></div><div class="robot-map-preview"><svg viewBox="0 0 720 440">${$('#map-svg').innerHTML}</svg></div></div>`;}
+      else html=`<div class="map-empty"><div class="map-empty-icon">${ICO.map}</div><h2>${t('暂无地图','No map available')}</h2><p>${t('创建地图后，可查看机器人位置与工作区域。','Create a map to view robot location and the working area.')}</p><button class="btn blue" id="work-map">${t('创建机器人地图','Create robot map')}</button></div>`;
+    }else if(this.page==='update'){
+      html=`<div class="screen on update-screen"><button class="btn ghost sm" id="back-settings">← ${t('设置','Settings')}</button><div class="h1" style="margin-top:20px">${t('版本更新','Version updates')}</div><p class="body-copy">${t('查看当前版本并检查可用更新。','View the current version and check updates.')}</p><div class="version-grid"><div class="version-row"><span>${t('当前版本','Current version')}</span><b>GBS 1.18</b></div></div><button class="btn blue" id="check-system-update" style="margin-top:24px">${t('检查更新','Check updates')}</button><p class="body-copy" id="system-update-result" role="status" style="margin-top:16px"></p></div>`;
+    }else if(this.page==='about'){
+      html=this.aboutScreen();
+    }else if(this.page==='wifi-settings'){
+      html=`<div class="screen on"><button class="btn ghost sm" id="back-settings">← ${t('设置','Settings')}</button><div class="h1" style="margin-top:16px">${t('切换 Wi-Fi','Switch Wi-Fi')}</div><p class="body-copy">${t('通过蓝牙下发新网络配置。请保持蓝牙开启；切换期间 Wi-Fi 连接会短暂中断。','New network settings are sent over Bluetooth. Keep Bluetooth enabled; Wi-Fi will briefly disconnect.')}</p><p class="body-copy" style="margin-top:12px">${t('机器人当前网络','Current robot network')}：<b>${appState.net.ssid||'Galbot-Office'}</b></p><form id="switch-wifi-form"><label class="mobile-field">${t('新的 Wi-Fi 热点','New Wi-Fi network')}<select class="input" id="new-wifi"><option>Galbot-Office</option><option>Galbot-Lab</option></select></label>${this.field('new-wifi-password',t('Wi-Fi 密码','Wi-Fi password'))}<p id="wifi-switch-status" class="body-copy" role="status"></p><button class="btn blue" id="switch-wifi-submit">${t('切换并重新连接','Switch and reconnect')}</button></form></div>`;
+    }else{
+      const menu=(id,icon,zh,en,detail='')=>`<button class="connect-device" id="${id}">${icon}<span>${t(zh,en)}${detail?`<small>${detail}</small>`:''}</span><span style="margin-left:auto">→</span></button>`;
+      html=`<div class="screen on settings-screen"><div class="h1">${t('设置','Settings')}</div>${menu('open-wifi-settings',ICO.wifi,'Wi-Fi 设置','Wi-Fi settings',appState.net.ssid||'Galbot-Office')}<label class="connect-device language-setting-row">${ICO.info}<span>${t('语音设置','Voice settings')}</span><select class="input" id="app-language"><option value="zh" ${!this.en?'selected':''}>简体中文</option><option value="en" ${this.en?'selected':''}>English</option></select></label>${menu('settings-guide',ICO.box,'开箱引导','Setup guide')}${menu('open-update',ICO.info,'版本更新','Version updates')}${menu('open-about',ICO.info,'关于本机','About this robot',t('硬件与软件信息','Hardware and software'))}</div>`;
+    }
+    bodyEl.innerHTML=html;
+    btnNext.style.display=btnPrev.style.display=btnSkip.style.display='none';
+    bodyEl.querySelectorAll('[data-mode]').forEach(b=>{b.disabled=!this.enabled;b.onclick=()=>{if(b.dataset.mode==='站立'){showConfirm(t('切换至站立？','Switch to Standing?'),t('请确认机器人未处于吊起离地状态。','Confirm the robot is not suspended above the ground.'),()=>{this.mode='站立';this.enabled=false;this.visual=false;renderStage();});return;}this.mode=b.dataset.mode; this.enabled=false;this.visual=false;renderStage();toast(t('模式命令已发送（模拟），重新核对站立状态后启用控制','Mode command sent (simulated). Confirm standing before enabling control.'),'info');};});
+    const on=(id,fn)=>{const el=$('#'+id);if(el)el.onclick=fn;};
+    bodyEl.querySelectorAll('[data-language]').forEach(b=>b.onclick=()=>{this.changeLanguage(b.dataset.language);});
+    on('open-remote',()=>{this.page='remote';renderStage();});
+    on('remote-back',()=>{this.page='control';renderStage();});
+    bodyEl.querySelectorAll('[data-posture]').forEach(b=>b.onclick=()=>{
+      const posture=b.dataset.posture;
+      showConfirm(t('切换至','Switch to ')+posture+'？',t('确认周围空间安全。站立姿态请确保机器人未吊起离地。此操作为原型演示。','Ensure the surrounding area is clear. Do not select Standing while suspended. This is a prototype simulation.'),()=>{if(emergencyStop.stopped)return;this.posture=posture;renderStage();toast(t('姿态命令已发送（模拟）','Posture command sent (simulated)'));});
+    });
+    this.bindRemote();
+    on('settings-guide',()=>this.goGuide(13));
+    on('start-system-check',()=>{const b=$('#start-system-check');b.disabled=true;b.textContent=t('检测中…','Checking…');this.timer=setTimeout(()=>{if(this.page==='home'){renderStage();toast(t('检测完成：1 项异常（模拟）','Check complete: 1 fault (simulated)'),'warn');}},900);});
+    on('language-next',()=>{appState.done[13]=true;this.goGuide(0);});
+    bodyEl.querySelectorAll('[data-home]').forEach(b=>b.onclick=()=>{if(b.dataset.home==='guide'){this.goGuide(appState.stage);return;}else this.page=b.dataset.home;renderStage();});
+    on('work-map',()=>openRobotMap(null));
+    bodyEl.querySelectorAll('[data-workmode]').forEach(b=>b.onclick=()=>{appState.workMode=b.dataset.workmode;saveProgress();renderStage();});
+    bodyEl.querySelectorAll('[data-run-scene]').forEach(b=>b.onclick=()=>{if(appState.runScene!==b.dataset.runScene){appState.done[14]=false;appState.done[12]=false;appState.fin=false;}appState.runScene=b.dataset.runScene;[7,9,10].forEach(id=>appState.skip[id]=appState.runScene==='数采');renderStage();});
+    on('save-operating-mode',()=>{this.page='home';renderStage();});
+    on('confirm-workmode',()=>{appState.done[14]=true;[7,9,10].forEach(id=>appState.skip[id]=appState.runScene==='数采');saveProgress();this.goGuide(appState.runScene==='数采'?12:7);});
+    on('change-workmode',()=>{this.page='mode-settings';renderStage();});
+    on('open-wifi-settings',()=>{this.page='wifi-settings';renderStage();});
+    on('open-update',()=>{this.page='update';renderStage();});
+    on('check-system-update',()=>{const button=$('#check-system-update');button.disabled=true;button.textContent=t('检查中…','Checking…');this.timer=setTimeout(()=>{if(this.page==='update'){button.disabled=false;button.textContent=t('再次检查','Check again');$('#system-update-result').textContent=t('检查完成，暂无可用更新（模拟）。','Check complete. No updates available (simulated).');}},800);});
+    on('open-about',()=>{this.page='about';renderStage();});
+    on('back-about',()=>{this.page='settings';renderStage();});
+    on('back-settings',()=>{clearTimeout(this.timer);this.page='settings';renderStage();});
+    const wifiForm=$('#switch-wifi-form');
+    if(wifiForm)wifiForm.onsubmit=e=>{
+      e.preventDefault();
+      const status=$('#wifi-switch-status');
+      if($('#demo-bluetooth').value!=='on'){status.textContent=t('请先开启蓝牙权限，再重试切换。','Enable Bluetooth access, then retry.');return;}
+      const network=$('#new-wifi').value;
+      const failed=$('#demo-result').value==='fail';
+      $('#switch-wifi-submit').disabled=true;
+      status.textContent=t('正在下发配置并等待机器人接入新网络…（模拟）','Sending settings and waiting for the new network… (simulated)');
+      this.timer=setTimeout(()=>{
+        if(this.page!=='wifi-settings')return;
+        $('#switch-wifi-submit').disabled=false;
+        if(failed){status.textContent=t('切换失败，请核对密码并重试。当前网络配置未更新。','Switch failed. Check the password and retry. Current settings are unchanged.');return;}
+        appState.net.ssid=network;appState.net.connected=true;
+        $('#new-wifi-password').value='';saveProgress();
+        renderStage();$('#wifi-switch-status').textContent=t('切换成功，机器人已重新连接（模拟）。请确保手机也接入同一网络。','Reconnected successfully (simulated). Ensure your phone uses the same network.');
+      },1500);
+    };
+    on('selfcheck-prev',()=>this.goGuide(3));
+    on('workmode-prev',()=>this.goGuide(2));
+    on('selfcheck-next',()=>this.goGuide(14));
+    on('start-search',()=>this.requestBluetooth());
+    on('select-robot',()=>this.connect('Galbot-G1-0826'));on('rescan',()=>this.search());on('cancel-search',()=>this.set('intro'));
+    on('go-connect',()=>{this.page='connect';renderStage();});
+    on('open-control',()=>this.exitGuide());
+    on('continue-oobe',()=>{this.ready=true;renderStage();});
+    const form=$('#connect-form');
+    if(form)form.onsubmit=e=>{e.preventDefault();this.validate('selfcheck',()=>{if(phase==='wifi'){this.linked=true;appState.net.paired=true;appState.net.connected=true;appState.net.step=4;appState.done[3]=true;}});};
+    on('enable-control',()=>{if(!$('#lever').checked||!$('#standing').checked){toast(t('请确认 E 拨杆向上且机器人站立','Confirm E lever is up and robot is standing'),'warn');return;}this.enabled=true;renderStage();});
+    ['lever','standing'].forEach(id=>{if($('#'+id))$('#'+id).onchange=()=>{if(!$('#'+id).checked){this.enabled=false;this.visual=false;renderStage();}};});
+    on('toggle-vision',()=>{if(!this.enabled){toast(t('请先启用机器人控制','Enable control first'),'warn');return;}this.visual=!this.visual;renderStage();});
+    if($('#voice'))$('#voice').onchange=()=>this.voice=$('#voice').checked;
+    on('send-action',()=>{if(!this.enabled){toast(t('请先启用机器人控制','Enable control first'),'warn');return;}showConfirm(t('确认执行动作？','Execute action?'),t('确认半径 4m 内无障碍物，安全绳已预留空间冗余。','Confirm the 4 m radius is clear and the safety rope has sufficient slack.'),()=>{$('#action-status').textContent=t('动作命令已发送（模拟）','Action command sent (simulated)')+(this.voice?t(' · 语音播报已触发（模拟）',' · Voice announcement triggered (simulated)'):'');});});
+    if($('#app-language'))$('#app-language').onchange=()=>{this.changeLanguage($('#app-language').value);};
+    emergencyStop.lockControls();
+  }
+  softwareStatus(){
+    const t=(zh,en)=>this.t(zh,en),state='error';
+    const status=state==='normal'?t('正常','Normal'):state==='error'?t('异常模式','Abnormal mode'):t('待同步','Awaiting sync');
+    const group=(title,en,items)=>`<div class="system-group"><h4>${t(title,en)}</h4>${items.map(([zh,en,i])=>{const error=state==='error'&&i===1;const pending=state==='pending';return `<div class="system-row ${error?'fault':''}"><span><i class="system-dot ${pending?'pending':error?'bad':''}"></i>${t(zh,en)}</span><b>${pending?t('待同步','Pending'):error?t('异常','Error'):t('正常','Normal')}</b>${error?`<p>${t('【0x0E020001】左臂相机无配置文件（模拟）','[0x0E020001] Left camera configuration missing (simulated)')}</p>`:''}</div>`;}).join('')}</div>`;
+    return `<section class="software-card"><div class="software-heading"><h2>${t('运行监测','Operation monitoring')}</h2><button class="btn blue sm" id="start-system-check">${t('开始检测','Start check')}</button></div><p class="software-note">${t('运行状态为原型演示，实际数据由机器人同步。','Prototype status; actual data will be synchronized from the robot.')}</p><div class="system-groups">${group('相机','Cameras',[['头部相机','Head camera',0],['左臂相机','Left arm camera',1],['右臂相机','Right arm camera',2]])}${group('雷达','LiDAR',[['头部雷达','Head LiDAR',3],['背部雷达','Back LiDAR',4],['底部雷达','Base LiDAR',5]])}${group('其他','Other',[['其他','Other services',6]])}</div></section>`;
+  }
+  softwareVersions(){return [['HPU','HPU'],['XCU','XCU'],['料箱搬运','Container handling'],['SPS','SPS'],['导航服务','Navigation service'],['定位服务','Localization service']];}
+  aboutScreen(){
+    const t=(zh,en)=>this.t(zh,en),pending=t('待同步','Awaiting sync');
+    const card=(title,en,rows)=>`<section class="about-card"><h3>${t(title,en)}</h3>${rows.map(([zh,en,value])=>`<div class="about-row"><span>${t(zh,en)}</span><b>${value||pending}</b></div>`).join('')}</section>`;
+    return `<div class="screen on"><div class="about-heading"><button class="btn ghost sm" id="back-about">← ${t('设置','Settings')}</button><h2>${t('关于本机','About this robot')}</h2></div><div class="about-layout"><div>${card('硬件信息','Hardware information',[['整机型号','Robot model','G1'],['整机版本','Hardware version'],['整机 SN','Serial number','GB1-2026-09941'],['IP 地址','IP address','192.168.0.23']])}${card('软件信息','Software information',this.softwareVersions())}</div><div class="about-robot"><img src="assets/robot-home.png" alt="G1 机器人"><p>${t('SN、IP 为演示数据；版本信息待机器人同步。','SN and IP are demo data. Versions await robot synchronization.')}</p></div></div></div>`;
+  }
+  remoteScreen(){
+    const t=(zh,en)=>this.t(zh,en), r=this.remote;
+    const arm=side=>`<section class="remote-panel"><h3>${t(side==='left'?'左臂':'右臂',side==='left'?'Left arm':'Right arm')}</h3>${r[side].map((value,i)=>`<div class="joint-row"><b>J${i+1}</b><button data-joint="${side}:${i}:-5" aria-label="${side} J${i+1} decrease">−</button><input type="range" min="-180" max="180" value="${value}" data-angle="${side}:${i}" aria-label="${side} J${i+1}"><button data-joint="${side}:${i}:5" aria-label="${side} J${i+1} increase">+</button><output id="angle-${side}-${i}">${value}°</output></div>`).join('')}<div class="grip-row"><b>${t('末端夹爪','Gripper')}</b>${['闭合','张开'].map((v,i)=>`<button class="${r[side+'Grip']===v?'selected':''}" data-grip="${side}:${v}">${t(v,i?'Open':'Close')}</button>`).join('')}</div></section>`;
+    return `<div class="remote-screen"><div class="remote-title"><button class="btn ghost" id="remote-back">← ${t('返回','Back')}</button><h2>${t('整机遥控','Whole-body control')}</h2><span>${t('模拟操作','Simulated controls')}</span></div><div class="remote-grid">${arm('left')}<div class="remote-middle"><section class="remote-panel"><h3>${t('头部','Head')}</h3><div class="head-pad">${[['up','↑'],['left','←'],['center','●'],['right','→'],['down','↓']].map(([key,label])=>`<button class="head-${key}" data-head="${key}" aria-label="Head ${key}">${label}</button>`).join('')}</div><p class="remote-value" id="head-value">${r.head[0]}° / ${r.head[1]}°</p></section><section class="remote-panel"><h3>${t('躯干升降','Torso height')}</h3><div class="torso-control"><button data-height="1">▲</button><output id="torso-height">${r.height.toFixed(2)} m</output><button data-height="-1">▼</button></div></section></div>${arm('right')}</div><div class="base-controls"><div class="direction-pad rotation-pad"><span class="stick-center" aria-hidden="true">●</span><button data-base="左转">↶</button><button data-base="右转">↷</button></div><div class="base-options"><label>${t('角速度','Angular speed')}<select id="angular-speed"><option value="0.2">0.2 rad/s</option><option value="0.1">0.1 rad/s</option></select></label><p>${t('遥控前确认 E 拨杆向上、机器人站立，周围无人且无障碍物。','Ensure no people or obstacles are nearby.')}<small>${t('关节范围及数值仅作界面示意。','Joint ranges and values are illustrative.')}</small></p><label>${t('线速度','Linear speed')}<select id="linear-speed"><option value="0.3">0.3 m/s</option><option value="0.1">0.1 m/s</option></select><span class="lock-label"><input id="direction-lock" type="checkbox" checked>${t('四项锁定','Four-direction lock')}</span></label></div><div class="direction-pad movement-pad"><button data-base="前进">↑</button><button data-base="左移">←</button><button data-base="停止">■</button><button data-base="右移">→</button><button data-base="后退">↓</button></div></div><p class="remote-feedback" id="remote-feedback" role="status">${t('等待操作 · 按住底盘方向键，松开停止（模拟）','Ready · Hold a base direction, release to stop (simulated)')}</p></div>`;
+  }
+  bindRemote(){
+    if(this.page!=='remote')return;
+    const feedback=msg=>$('#remote-feedback').textContent=msg+'（模拟）';
+    const update=(side,i,value)=>{this.remote[side][i]=Math.max(-180,Math.min(180,value));$('#angle-'+side+'-'+i).textContent=this.remote[side][i]+'°';bodyEl.querySelector(`[data-angle="${side}:${i}"]`).value=this.remote[side][i];feedback(side+' J'+(i+1)+'：'+this.remote[side][i]+'°');};
+    bodyEl.querySelectorAll('[data-joint]').forEach(b=>b.onclick=()=>{const [side,i,delta]=b.dataset.joint.split(':');update(side,+i,this.remote[side][+i]+Number(delta));});
+    bodyEl.querySelectorAll('[data-angle]').forEach(el=>el.oninput=()=>{const [side,i]=el.dataset.angle.split(':');update(side,+i,+el.value);});
+    bodyEl.querySelectorAll('[data-grip]').forEach(b=>b.onclick=()=>{const [side,value]=b.dataset.grip.split(':');this.remote[side+'Grip']=value;renderStage();feedback((side==='left'?'左':'右')+'夹爪'+value);});
+    bodyEl.querySelectorAll('[data-head]').forEach(b=>b.onclick=()=>{const key=b.dataset.head;if(key==='center')this.remote.head=[0,0];else{const i=['left','right'].includes(key)?0:1;this.remote.head[i]=Math.max(-90,Math.min(90,this.remote.head[i]+(['up','right'].includes(key)?5:-5)));}$('#head-value').textContent=this.remote.head.join('° / ')+'°';feedback('头部方向已调整');});
+    bodyEl.querySelectorAll('[data-height]').forEach(b=>b.onclick=()=>{this.remote.height=Math.max(.5,Math.min(1.2,this.remote.height+Number(b.dataset.height)*.01));$('#torso-height').textContent=this.remote.height.toFixed(2)+' m';feedback('躯干高度已调整');});
+    bodyEl.querySelectorAll('[data-base]').forEach(b=>{const stop=()=>feedback('底盘停止');b.onpointerdown=e=>{e.preventDefault();b.setPointerCapture(e.pointerId);feedback('底盘'+b.dataset.base+' · '+$('#linear-speed').value+' m/s · '+$('#angular-speed').value+' rad/s');};b.onpointerup=stop;b.onpointercancel=stop;b.onlostpointercapture=stop;b.onkeydown=e=>{if([' ','Enter'].includes(e.key)){e.preventDefault();feedback('底盘'+b.dataset.base);}};b.onkeyup=stop;b.onblur=stop;});
+  }
+  goGuide(id){
+    clearTimeout(this.timer);this.page='connect';appState.stage=id;this.ready=false;
+    if(id===13)this.set('language');
+    else if(id===3)this.set('intro');
+    else if(id===2){if(appState.diag.every(Boolean)){this.phase='selfcheck';renderStage();}else this.set('selfcheck');}
+    else if(id===14)this.set('workmode');
+    else{this.ready=true;renderStage();}
+    saveProgress();
+  }
+  workModeLabel(){const i=WORK_MODES.indexOf(appState.workMode);return i<0?this.t('未设置','Not set'):this.t(WORK_MODES[i],WORK_MODE_EN[i]);}
+  workModeOptions(){return `<div class="workmode-grid">${WORK_MODES.map((m,i)=>`<button type="button" data-workmode="${m}" class="${appState.workMode===m?'selected':''}">${this.t(m,WORK_MODE_EN[i])}</button>`).join('')}</div>`;}
+  requestBluetooth(){
+    if($('#demo-bluetooth').value==='on'){this.search();return;}
+    showConfirm(this.t('开启蓝牙与设备访问权限','Enable Bluetooth and device access'),this.t('搜索机器人需要使用蓝牙。请开启手机蓝牙，并在系统设置中允许 App 访问蓝牙或附近设备。开启后重新检测。','Robot discovery requires Bluetooth. Enable Bluetooth and allow this app to access Bluetooth or nearby devices in system settings, then retry.'),()=>{$('#demo-bluetooth').value='on';this.search();});
+    $('#confirm-ok').textContent=this.t('已开启，重新检测','Enabled, check again');
+    $('#confirm-cancel').textContent=this.t('暂不开启','Not now');
+  }
+  changeLanguage(value){
+    this.en=value==='en';appState.lang=value;
+    document.documentElement.lang=value;
+    try{localStorage.setItem('galbot_app_language',value);}catch(e){}
+    renderStage();
+  }
+  exitGuide(){
+    if(!this.linked)return;
+    clearTimeout(this.timer);this.ready=false;this.page='home';saveProgress();renderStage();
+  }
+  chrome(){
+    const t=(zh,en)=>this.t(zh,en);
+    const workspace=this.linked&&!this.ready&&this.page!=='connect';
+    $('.app-shell').classList.toggle('workspace',workspace);
+    $('.landscape-device').classList.toggle('in-workspace',workspace);
+    $('.app-shell').classList.toggle('remote-open',this.page==='remote');
+    $('.landscape-device').classList.toggle('in-remote',this.page==='remote');
+    $('#mobile-title').textContent=t(workspace?'机器人工作台':'开箱引导',workspace?'Robot workspace':'Setup guide');
+    $('#header-device-status').innerHTML='';
+    emergencyStop.mount(workspace);
+    $('#robot-info').textContent=this.linked?'SN: GB1-2026-09941 · '+t('电量','Battery')+' 82%':'';
+    $('#robot-info').title=t('SN 与电量为原型演示数据','SN and battery are prototype data');
+    $('#mobile-settings').style.display=workspace?'none':'';
+    $('#mobile-settings').title=t('设置 / App 语言','Settings / App language');
+    $('#app-nav').innerHTML=workspace?[['home','首页','Home'],['control','控制','Control'],['map','地图','Map'],['settings','设置','Settings']].map(([id,zh,en])=>`<button class="${this.page===id||(id==='control'&&this.page==='remote')||(id==='settings'&&['wifi-settings','about','update'].includes(this.page))?'active':''}" data-page="${id}">${t(zh,en)}</button>`).join(''):'';
+    $('#app-nav').querySelectorAll('[data-page]').forEach(b=>b.onclick=()=>{
+      clearTimeout(this.timer);
+      if(b.dataset.page==='guide'){this.goGuide(appState.stage);return;}
+      else{this.ready=false;this.page=b.dataset.page;}
+      renderStage();
+    });
+    $('#mobile-settings').onclick=()=>{
+      $('#language-setting').value=this.en?'en':'zh';
+      $('#app-settings-title').textContent=t('设置','Settings');
+      $('#language-setting-label').textContent=t('通用设置 · App 语言设置','General settings · App language');
+      $('#mobile-settings-overlay').classList.add('on');
+    };
+  }
+  validate(next,success){
+    const failed=$('#demo-result').value==='fail';
+    const phase=this.phase;
+    this.validatingPhase=phase;
+    if(next)this.set('checking');
+    this.timer=setTimeout(()=>{if(failed){if(next)this.set(phase);$('#form-error').textContent=this.t('密码校验失败，请重新输入。','Password validation failed. Try again.');return;}if(success)success();if(next)this.set(next);},900);
+  }
+}
+const robotConnection=new RobotConnection();
+$('#demo-system').onchange=()=>{if(robotConnection.page==='home')renderStage();};
+$('#webview-back').onclick=()=>switchView('app');
+try{robotConnection.en=localStorage.getItem('galbot_app_language')==='en';}catch(e){}
+$('#language-setting').onchange=()=>{robotConnection.changeLanguage($('#language-setting').value);robotConnection.chrome();};
+$('#close-mobile-settings').onclick=()=>$('#mobile-settings-overlay').classList.remove('on');
+$('#mobile-settings-overlay').onclick=e=>{if(e.target.id==='mobile-settings-overlay')e.target.classList.remove('on');};
+
+/* ---------- 进度持久化（中途退出后恢复） ---------- */
+const SAVE_KEY = 'galbot_oobe_state_v2';
+function saveProgress(){
+  try{
+    const snap = {
+      workMode:appState.workMode,
+      runScene:appState.runScene,
+      stage: appState.stage,
+      done: appState.done,
+      skip: appState.skip,
+      lang: appState.lang,
+      unbox: appState.unbox,
+      diag: appState.diag,
+      net: {...appState.net, pwd:''},
+      device: appState.device,
+      update: appState.update,
+      scene: appState.scene,
+      mapStage: {...appState.mapStage, detected:false, detecting:false},
+      loc: appState.loc,
+      nav: appState.nav,
+      safe: appState.safe,
+      golive: { checks: appState.golive.checks, steps: appState.golive.steps, finished: appState.golive.finished, tested: appState.golive.tested, _started:false },
+      fin: appState.fin,
+      _t: Date.now(),
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(snap));
+  }catch(e){ /* 忽略存储失败 */ }
+}
+function loadProgress(){
+  try{
+    const raw = localStorage.getItem(SAVE_KEY);
+    if(!raw) return false;
+    const snap = JSON.parse(raw);
+    if(!snap || typeof snap.stage!=='number') return false;
+    Object.assign(appState, snap);
+    if(!appState.runScene&&snap.workMode)appState.runScene=snap.workMode==='采集'?'数采':'标准';
+    if(appState.golive) appState.golive._started = false;
+    return true;
+  }catch(e){ return false; }
+}
+function clearProgress(){
+  try{ localStorage.removeItem(SAVE_KEY); }catch(e){}
+}
+
+function toast(msg, type='ok'){
+  const t = $('#toast');
+  t.innerHTML = (type==='ok'?'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5l5 5 10-11"/></svg>':type==='warn'?ICO.warn:ICO.info) + '<span>'+msg+'</span>';
+  t.className = 'toast on ' + type;
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(()=> t.className='toast', 2200);
+}
+
+/* ---------- 进度轨道渲染 ---------- */
+function renderTrack(){
+  const groups=activeGroups(),current=groups.findIndex(group=>group.pages.includes(appState.stage));
+  trackEl.style.gridTemplateColumns=`repeat(${groups.length},minmax(0,1fr))`;
+  trackEl.innerHTML=groups.map((group,index)=>{
+    const done=group.pages.every(id=>appState.done[id]),active=index===current;
+    const target=active?group.pages.find(id=>!appState.done[id])??group.pages[0]:group.pages[0];
+    const label=`第 ${index+1} 步 ${group.name}`;
+    return `<div class="track-dot ${active?'cur ':''}${done?'done':''}${done||active?' review':''}" data-review="${target}" data-available="${done||active}" data-tip="${label}${done?' · 已完成，点击回看':''}"><i>${done?ICO.check:''}</i><span class="step-label">${group.name}</span></div>`;
+  }).join('');
+  countEl.textContent=`第 ${current+1} / ${groups.length} 步`;
+  if(robotConnection.linked&&robotConnection.page==='connect'){
+    countEl.innerHTML+='<button id="rail-exit" class="rail-exit">退出引导</button>';
+    $('#rail-exit').onclick=()=>robotConnection.exitGuide();
+  }
+  trackEl.querySelectorAll('[data-review]').forEach(node=>node.onclick=()=>{
+    if(node.dataset.available==='true')robotConnection.goGuide(+node.dataset.review);
+  });
+}
+
+function footStatus(){
+  const s = STAGES[appState.stage];
+  if(appState.done[appState.stage]){
+    footEl.className='foot-status ok';
+    footEl.innerHTML = ICO.check + ` <b>${s.label} ${s.name}</b> · 已完成`;
+  }else if(appState.skip[appState.stage]){
+    footEl.className='foot-status cur';
+    footEl.innerHTML = ICO.warn + ` <b>${s.label} ${s.name}</b> · 已跳过`;
+  }else{
+    footEl.className='foot-status cur';
+    footEl.innerHTML = ICO.nav + ` 当前步骤：<b>${s.label} ${s.name}</b>`;
+  }
+}
+
+class RobotManual {
+  static open(section){
+    $('#document-title').textContent=section;
+    $('#document-frame').src='https://developer.galbot.com/docs/g1/2.2.4/zh/g1#'+encodeURIComponent(section);
+    $('#document-webview').hidden=false;
+  }
+  static close(){
+    $('#document-webview').hidden=true;
+    $('#document-frame').src='about:blank';
+  }
+}
+$('#document-back').onclick=()=>RobotManual.close();
+
+/* ---------- 各阶段屏幕 ---------- */
+function screenUnbox(){
+  const items = ['开箱检查','安装电池','放置机器人','机器人开机'];
+  return `
+  <div class="screen on">
+    <div class="h1">开箱检查与装机</div>
+    <div class="body-copy">按顺序完成以下步骤，将机器人从包装中取出并准备通电。</div>
+    <div class="card" style="margin-top:14px">
+      ${items.map((t,i)=>`
+        <div class="check-item">
+          <div class="check-box ${appState.unbox[i]?'on':''}" data-unbox="${i}">${ICO.check}</div>
+          <div class="ci-body">
+            <div class="ci-title"><span class="ci-step">0${i+1}</span> ${t}</div>
+            <div class="ci-desc">${['核对装箱单与随机附件','将电池装入机器人底部电池仓','将机器人放置在平整开阔区域','按开机说明启动机器人，等待开机完成'][i]}</div>
+          </div>
+          ${i===0||i===3?`<a class="manual-link" href="https://developer.galbot.com/docs/g1/2.2.4/zh/g1#${encodeURIComponent(i===0?'开箱说明':'如何开机')}" data-manual="${i===0?'开箱说明':'如何开机'}">${i===0?'开箱说明':'如何开机'} ↗</a>`:''}
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+function screenWelcome(){
+  const t=(zh,en)=>robotConnection.t(zh,en);
+  return `<div class="screen on"><div class="h1">${t('开始开箱检查','Start setup checks')}</div><p class="body-copy">${t('接下来完成自检、更新检查、场景和地图配置。语言可随时通过右上角设置切换。','Continue with diagnostics, update checks, scene and map setup. Change language in Settings at any time.')}</p></div>`;
+}
+function screenDiag(){
+  const items = [
+    ['激光雷达 / 深度传感器', '探测传感器通信正常'],
+    ['电机驱动器', '各关节驱动响应正常'],
+    ['急停回路', '急停信号回路导通'],
+    ['通信模块', 'WiFi / BLE 模块就绪'],
+  ];
+  return `
+  <div class="screen on diagnostic-screen">
+    <div class="h1">${appState.diag.every(Boolean)?'系统自检完成':'系统自检中'}</div>
+    <div class="body-copy diagnostic-note">${appState.diag.every(Boolean)?'':'正在检测核心硬件，请稍候。'}</div>
+    <div style="margin-top:14px">
+      ${items.map((it,i)=>`
+        <div class="diag-item ${appState.diag[i]?'ok':''}" data-diag="${i}">
+          <div class="diag-ico">${ICO.robot}</div>
+          <div class="diag-name">${it[0]}</div>
+          <div class="diag-state">${appState.diag[i]?'正常':'待检测'}</div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+function screenNet(){
+  return `<div class="screen on"><div class="h1">机器人网络</div><p class="body-copy">${appState.net.connected?'机器人已通过启动连接流程完成 Wi-Fi 配置。':'请返回连接机器人，完成 Wi-Fi 密码校验。'}</p><div class="connect-actions"><button class="btn ghost" id="network-connect">重新连接机器人</button></div></div>`;
+}
+function screenUpdate(){
+  const u=appState.update;
+  return `<div class="screen on"><div class="h1">系统更新</div>
+    <p class="body-copy">检查机器人系统是否有可用更新，也可以跳过。</p>
+    <button class="btn blue" id="update-check" style="margin-top:24px" ${u.checking?'disabled':''}>${u.checking?'正在检查…':'检查更新'}</button>
+    <p class="body-copy" role="status" style="margin-top:16px">${u.checked?'检查完成（模拟） · 当前系统已是最新版本':''}</p></div>`;
+}
+function screenScene(){
+  const scenes = [
+    ['零售门店', '商品配送、导购、盘点', ICO.cart],
+    ['工业产线', '物料搬运、上下料', ICO.gear],
+    ['酒店迎宾', '迎宾导览、引领', ICO.home],
+    ['科研教育', '教学演示、实验', ICO.scan],
+  ];
+  return `
+  <div class="screen on">
+    <div class="eyebrow">${ICO.home} STAGE 6 · 场景与角色设置</div>
+    <div class="h1">选择业务场景</div>
+    <div class="body-copy">场景决定后续建图、点位的默认模板与业务参数。</div>
+    <div class="scene-grid">
+      ${scenes.map((s,i)=>`
+        <div class="scene-card ${appState.scene===i?'sel':''}" data-scene="${i}">
+          <div class="sc-ico">${s[2]}</div>
+          <div class="sc-name">${s[0]}</div>
+          <div class="sc-desc">${s[1]}</div>
+          <div class="sc-tag">${i===0?'推荐 · 默认':'可选'}</div>
+        </div>`).join('')}
+    </div>
+  </div>`;
+}
+function openRobotMap(stage){
+  showConfirm('地图管理','地图管理建议使用 PC 操作。是否继续在当前设备打开？',()=>{
+  appState.mapStage._from=stage;
+  MAP.mode=stage===7&&!MAP.built?'build':'edit';
+  if(MAP.mode==='build')MAP.build=0;
+  switchView('map');
+  });
+}
+function screenMapJump(stage){
+  if(stage===7 && !appState.mapStage.detected){
+    return `<div class="screen on"><div class="h1">检测机器人地图</div><p class="body-copy" role="status">正在检查机器人是否已有地图…</p></div>`;
+  }
+  if(!appState.mapStage.built){
+    return `<div class="screen on"><div class="h1">暂无机器人地图</div><p class="body-copy">请在地图管理平台创建地图，建议使用 PC 操作。</p><button class="btn blue" data-jump="${stage}" style="margin-top:20px">打开地图管理平台</button><button class="btn ghost" id="defer-mapping" style="margin:20px 0 0 12px">跳过，稍后建图</button></div>`;
+  }
+  renderMapCanvas();
+  const svg=$('#map-svg').innerHTML+`<g transform="translate(118,92)">${robotSvg()}</g>`;
+  return `<div class="screen on"><div class="screen-heading"><div class="h1">${stage===7?'机器人地图':'地图编辑'}</div><button class="btn ghost sm" data-jump="${stage}">${stage===7?'管理地图':'打开地图管理平台'}</button></div>
+    <p class="body-copy">${stage===7?'已检测到地图，可继续下一步。':'查看并编辑禁行线与关键点位。'}</p>
+    <div class="robot-map-preview"><svg viewBox="0 0 720 440" aria-label="机器人地图">${svg}</svg></div>
+    </div>`;
+}
+function screenLoc(){
+  const target = 0.96;
+  const shown = appState.loc;
+  return `
+  <div class="screen on location-screen">
+    <div class="h1">验证定位精度</div>
+    <div class="body-copy">机器人正在与地图进行匹配，确认定位位置与实际一致。</div>
+    <div class="loc-ring">
+      <svg viewBox="0 0 120 120">
+        <circle class="ring-bg" cx="60" cy="60" r="54"/>
+        <circle class="ring-fg" cx="60" cy="60" r="54" style="stroke-dashoffset:${340-(shown/100*340)}"/>
+      </svg>
+      <div class="loc-num"><span class="n">${shown.toFixed(2)}</span><span class="l">定位置信度</span></div>
+    </div>
+    <div class="loc-ok" style="display:${shown>=96?'flex':'none'}">${ICO.done} 定位正常，可进入下一步</div>
+  </div>`;
+}
+function screenNav(){
+  const n = appState.nav;
+  return `
+  <div class="screen on">
+    <div class="eyebrow">${ICO.nav} STAGE 10 · 导航测试</div>
+    <div class="h1">点到点导航测试</div>
+    <div class="body-copy">下发测试导航点，验证机器人避障与到位精度。</div>
+    <div class="nav-map" id="nav-map">
+      ${Array.from({length:60},(_,i)=>{const x=(i*37)%660, y=(i*29)%200; return `<span class="grid-dot" style="left:${x+20}px;top:${y+10}px"></span>`}).join('')}
+      <div class="nav-status" id="nav-status">${n.done?'测试通过':'待测试'}</div>
+      <div class="nav-path" id="nav-path"></div>
+      <div class="nav-point" style="left:82%;top:58%"></div><span class="nav-tag" style="left:82%;top:58%">取货点 A</span>
+      <div class="nav-point" style="left:18%;top:22%"></div><span class="nav-tag" style="left:18%;top:22%">Home 点</span>
+      <div class="nav-robot" id="nav-robot" style="left:18%;top:22%">${ICO.robot}</div>
+    </div>
+  </div>`;
+}
+function screenSafe(){
+  const s = appState.safe;
+  return `
+  <div class="screen on">
+    <div class="eyebrow">${ICO.warn} STAGE 11 · 安全配置</div>
+    <div class="h1">安全策略设置</div>
+    <div class="body-copy">配置安全监控区与速度限制，并测试急停。</div>
+    <div class="safe-grid">
+      <div class="safe-card">
+        <div class="sc-ico">${ICO.warn}</div>
+        <div class="sc-name">安全监控区</div>
+        <div class="sc-desc">人员闯入预警区域（可选）</div>
+        <div class="toggle ${s.zone?'on':''}" id="safe-zone"></div>
+      </div>
+      <div class="safe-card">
+        <div class="sc-ico">${ICO.nav}</div>
+        <div class="sc-name">速度限制</div>
+        <div class="sc-desc">正常区 / 减速区参数</div>
+        <div class="toggle ${s.speed?'on':''}" id="safe-speed"></div>
+      </div>
+    </div>
+    <button class="estop ${s.estop?'fine':''}" id="safe-estop">
+      ${ICO.estop}
+      ${s.estop?'急停回路正常，点击可再次测试':'测试急停按钮'}
+      <small>${s.estop?'测试通过 · 已复位':'按下后机器人应立即制动'}</small>
+    </button>
+  </div>`;
+}
+function screenGolive(){
+  const g=appState.golive;
+  return `<div class="screen on guide-completion"><div class="h1">${robotConnection.t('开箱引导完成','Setup complete')}</div><div class="connect-actions"><button class="btn blue" id="guide-start-work">${robotConnection.t('开始工作','Start work')}</button></div></div>`;
+}
+
+/* ---------- 主渲染 ---------- */
+function renderStage(){
+  if(appState.runScene==='数采'&&[7,8,9,10].includes(appState.stage))appState.stage=12;
+  robotConnection.chrome();
+  if(!FLOW.some(s=>s.id===appState.stage))appState.stage=13;
+  $('.app-shell').classList.toggle('connecting',!robotConnection.ready);
+  if(!robotConnection.ready){ robotConnection.render();renderTrack();return; }
+  $('.progress-title').textContent='开箱引导进度';
+  renderTrack();
+  footStatus();
+  const s = appState.stage;
+  const mapNote = [
+    ['Stage 0：物理开箱', '核对配件、安装电池、放置机器人，为通电做准备。'],
+    ['Stage 1：欢迎与初始化', '选择语言，确认开箱完成，进入向导。'],
+    ['Stage 2：开机自检', '自动检测传感器、电机、急停与通信模块。'],
+    ['Stage 3：网络配置', '启动连接已完成 Wi-Fi 密码校验。'],
+    ['默认配置', '无需操作。'],
+    ['Stage 5：系统更新', '检查系统更新，可跳过。'],
+    ['Stage 6：场景与角色设置', '按业务选择场景模板，确定角色参数。'],
+    ['Stage 7：建图引导', '跳转网页版地图管理平台完成建图。'],
+    ['Stage 8：地图编辑', '标注禁行线、Home 点、取货/放置/充电点。'],
+    ['Stage 9：定位校准', '确认定位置信度达标。'],
+    ['Stage 10：导航测试', '点到点导航与避障验证。'],
+    ['Stage 11：安全配置', '安全监控区、速度限制与急停测试。'],
+    ['Stage 12：完成与开始工作', '开始工作前检查 → 一键开始工作 → 首单测试 → 完成。'],
+  ][s];
+  noteEl.innerHTML = `<b>${mapNote[0]}</b> · ${mapNote[1]}`;
+
+  let html = '';
+  switch(s){
+    case 0: html = screenUnbox(); break;
+    case 1: html = screenWelcome(); break;
+    case 2: html = screenDiag(); break;
+    case 3: html = screenNet(); break;
+    case 5: html = screenUpdate(); break;
+    case 6: html = screenScene(); break;
+    case 7: case 8: html = screenMapJump(s); break;
+    case 9: html = screenLoc(); break;
+    case 10: html = screenNav(); break;
+    case 11: html = screenSafe(); break;
+    case 12: html = screenGolive(); break;
+  }
+  bodyEl.innerHTML = html.replace(/STAGE \d+/g,STAGES[s].label);
+  bindStageEvents();
+
+  // 底部按钮
+  btnNext.textContent = '下一步';
+  btnNext.disabled = (s===0 && !appState.unbox.every(Boolean)) || (s===2 && !appState.diag.every(Boolean)) || (s===3 && !appState.net.connected) || (s===7 && !appState.mapStage.built);
+  btnNext.style.display = s===12 ? 'none' : '';
+  btnPrev.style.display = s===12 || stepNumber()===1 ? 'none' : '';
+  // 跳过按钮：未完成阶段可跳过（Stage 0 开箱必须完成；Stage 12 开始工作动画可快进）
+  const skippable = false;
+  if(s===12 && !appState.golive.finished){
+    btnSkip.style.display = 'none';
+    btnSkip.textContent = '跳过开始工作动画';
+  }else{
+    btnSkip.style.display = skippable ? '' : 'none';
+    btnSkip.textContent = '跳过本步';
+  }
+}
+
+/* ---------- 阶段事件绑定 ---------- */
+function bindStageEvents(){
+  const s = appState.stage;
+  document.querySelectorAll('[data-manual]').forEach(button=>button.onclick=event=>{event.preventDefault();RobotManual.open(button.dataset.manual);});
+  // Stage 0
+  document.querySelectorAll('[data-unbox]').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const i = +el.dataset.unbox;
+      appState.unbox[i] = !appState.unbox[i];
+      renderStage();
+    });
+  });
+  // Stage 1 语言
+  document.querySelectorAll('[data-lang]').forEach(el=>{
+    el.addEventListener('click', ()=>{ appState.lang = el.dataset.lang; renderStage(); });
+  });
+  // Stage 1 确认开箱勾选
+  const wc = $('#welcome-check');
+  if(wc) wc.addEventListener('click', ()=>{
+    if(!appState.unbox.every(Boolean)){
+      appState.unbox = [true,true,true,true];
+      appState.done[1] = true;
+      renderStage();
+      toast('已确认开箱完成','ok');
+    }
+  });
+  // Stage 2 自检（自动跑）
+  if(s===2 && !appState.diag.every(Boolean) && !appState._diagRunning){
+    appState._diagRunning=true;
+    let i = appState.diag.filter(Boolean).length;
+    const run = setInterval(()=>{
+      if(appState.stage!==2 || !robotConnection.ready){ clearInterval(run); appState._diagRunning=false; return; }
+      appState.diag[i] = true;
+      i++;
+      renderStage();
+      if(i>=4){
+        clearInterval(run); appState._diagRunning=false;
+        setTimeout(()=>{ appState.done[2]=true; renderStage(); }, 500);
+      }
+    }, 700);
+  }
+  const networkConnect=$('#network-connect');
+  if(networkConnect)networkConnect.onclick=()=>{robotConnection.ready=false;robotConnection.page='connect';robotConnection.set('intro');};
+  // 系统更新仅检查，不自动下载或安装。
+  const updateCheck=$('#update-check');
+  if(updateCheck)updateCheck.onclick=()=>{
+    appState.update.checking=true;renderStage();
+    setTimeout(()=>{appState.update.checking=false;appState.update.checked=true;appState.done[5]=true;saveProgress();renderStage();},900);
+  };
+  // Stage 6 场景
+  document.querySelectorAll('[data-scene]').forEach(el=>{
+    el.addEventListener('click', ()=>{ appState.scene = +el.dataset.scene; renderStage(); });
+  });
+  if(s===7 && !appState.mapStage.detected && !appState.mapStage.detecting){
+    appState.mapStage.detecting=true;
+    setTimeout(()=>{
+      const hasMap=appState.mapStage.built||MAP.built||$('#demo-map').value==='yes';
+      appState.mapStage.detecting=false;appState.mapStage.detected=true;
+      if(hasMap){MAP.built=true;MAP.build=100;appState.mapStage.built=true;appState.done[7]=true;}
+      saveProgress();
+      if(appState.stage!==7 || !robotConnection.ready)return;
+      renderStage();
+    },900);
+  }
+  const deferMapping=$('#defer-mapping');
+  if(deferMapping)deferMapping.onclick=()=>{[7,9,10].forEach(id=>appState.skip[id]=true);saveProgress();robotConnection.goGuide(12);};
+  document.querySelectorAll('[data-jump]').forEach(el=>el.onclick=()=>openRobotMap(+el.dataset.jump));
+  // Stage 9 定位（自动动画）
+  if(s===9 && appState.loc<96){
+    const t = setInterval(()=>{
+      if(appState.stage!==9 || !robotConnection.ready){ clearInterval(t); return; }
+      appState.loc += 9 + Math.random()*7;
+      if(appState.loc>=96){ appState.loc=96; clearInterval(t); setTimeout(()=>{ appState.done[9]=true; renderStage(); }, 800); }
+      renderStage();
+    }, 420);
+  }
+  // Stage 10 导航测试
+  if(s===10){
+    const st = $('#nav-status');
+    if(st && !appState.nav.done){
+      const robot = $('#nav-robot'), path = $('#nav-path');
+      setTimeout(()=>{
+        path.style.cssText = 'position:absolute;left:18%;top:22%;width:64%;height:2px;opacity:1';
+        robot.style.left = '82%';
+        robot.style.top = '58%';
+        setTimeout(()=>{
+          path.style.cssText = 'position:absolute;left:82%;top:58%;width:8%;height:2px;opacity:0';
+          appState.nav.done = true;
+          const st2 = $('#nav-status');
+          if(st2){ st2.className='nav-status ok'; st2.textContent='测试通过'; }
+          setTimeout(()=>{ appState.done[10] = true; renderStage(); }, 900);
+        }, 2400);
+      }, 900);
+    }
+  }
+  // Stage 11 安全
+  if(s===11){
+    const z = $('#safe-zone'); if(z) z.addEventListener('click', ()=>{ appState.safe.zone = !appState.safe.zone; renderStage(); });
+    const spd = $('#safe-speed'); if(spd) spd.addEventListener('click', ()=>{ appState.safe.speed = !appState.safe.speed; renderStage(); });
+    const e = $('#safe-estop');
+    if(e) e.addEventListener('click', ()=>{
+      if(!appState.safe.estop){
+        appState.safe.estopPressed = true;
+        e.innerHTML = ICO.estop + '<span>急停已触发 · 机器人已制动</span><small>再次点击复位</small>';
+        setTimeout(()=>{
+          appState.safe.estop = true;
+          appState.done[11] = true;
+          renderStage();
+          toast('急停测试通过','ok');
+        }, 1300);
+      }
+    });
+  }
+  const startWork=$('#guide-start-work');
+  if(startWork)startWork.onclick=()=>{
+    appState.golive.finished=true;appState.done[12]=true;appState.fin=true;saveProgress();robotConnection.linked=true;robotConnection.exitGuide();
+  };
+}
+
+/* ---------- 上一步 / 下一步 ---------- */
+function next(){
+  if(!robotConnection.ready) return;
+  const s = appState.stage;
+  if(s===0 && !appState.unbox.every(Boolean)) return;
+  if(s===2 && !appState.diag.every(Boolean)) return;
+  if(s===3 && !appState.net.connected) return;
+  if(s===7 && !appState.mapStage.built) return;
+  // 标记当前完成（若未标记）
+  if(!appState.done[s] && !appState.skip[s]){
+    // Stage 有完成条件的在各自逻辑里标记；这里兜底
+    if(s===1 && !appState.unbox.every(Boolean)){ toast('请先确认开箱完成','warn'); return; }
+    if(s===6 && appState.scene===null){ toast('请先选择业务场景','warn'); return; }
+    if(s===12 && !appState.golive.finished){ toast('请等待一键开始工作流程完成','warn'); return; }
+    appState.done[s] = true;
+  }
+  if(s!==12){
+    moveStage();
+    appState.golive._started = false;
+    robotConnection.goGuide(appState.stage);
+  }
+}
+function prev(){
+  if(stepNumber()>1){
+    moveStage(-1);
+    appState.golive._started = false;
+    robotConnection.goGuide(appState.stage);
+  }
+}
+btnNext.addEventListener('click', next);
+btnPrev.addEventListener('click', prev);
+/* 跳过当前阶段（二次确认） */
+btnSkip.addEventListener('click', ()=>{
+  const s = appState.stage;
+  const st = STAGES[s];
+  if(s===12 && !appState.golive.finished){
+    showConfirm('跳过开始工作动画？', `跳过将直接标记 <b>${st.name}</b> 为完成，不展示开始工作过程动画。可在部署报告查看结果。`, ()=>{
+      appState.golive.checks = appState.golive.checks.map(()=>true);
+      appState.golive.steps = appState.golive.steps.map(()=>true);
+      appState.golive.finished = true;
+      appState.done[12] = true;
+      appState.fin = true;
+      saveProgress();
+      renderStage();
+      toast('已跳过开始工作动画，标记为完成','info');
+    });
+    return;
+  }
+  showConfirm(`跳过「${st.name}」？`, `非关键步骤可跳过。<br>跳过后的步骤将在总结页标记为 <b>未完成</b>，且可能影响后续功能（如跳过建图将无法导航）。确认继续吗？`, ()=>{
+    appState.skip[s] = true;
+    if(s < 12){
+      moveStage();
+      appState.golive._started = false;
+      saveProgress();
+      renderStage();
+      toast('已跳过本步，继续后续流程','info');
+    }
+  });
+});
+
+/* ---------- 帮助弹层 ---------- */
+const helpOverlay = $('#help-overlay');
+function openHelp(){
+  const s = appState.stage;
+  const h = HELP[s];
+  if(!h){ toast('该步骤暂无帮助内容','info'); return; }
+  $('#help-title').innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.5a2.5 2.5 0 114.8.8c-.6 1.2-2.3 1.6-2.3 2.9M12 16.5v.01" stroke-linecap="round"/></svg> ${h.title}`;
+  $('#help-sub').textContent = h.sub;
+  $('#help-body').innerHTML = h.steps.map((st,i)=>{
+    const ic = ICO[st.ic] || ICO.help || ICO.info;
+    const link = st.link ? `<span class="hs-link">${st.link}<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M9 7h8v8" stroke-linecap="round" stroke-linejoin="round"/></svg></span>` : '';
+    return `<div class="help-step">
+      <div class="hs-ico">${ic}</div>
+      <div class="hs-body"><b>${st.t}</b><span>${st.d}</span>${link}</div>
+    </div>`;
+  }).join('');
+  helpOverlay.classList.add('on');
+}
+$('#btn-help').addEventListener('click', openHelp);
+helpOverlay.querySelector('[data-close="help"]').addEventListener('click', ()=> helpOverlay.classList.remove('on'));
+helpOverlay.addEventListener('click', (e)=>{ if(e.target===helpOverlay) helpOverlay.classList.remove('on'); });
+
+/* ---------- 确认弹层 ---------- */
+const confirmOverlay = $('#confirm-overlay');
+let confirmCb = null;
+function showConfirm(title, msg, cb){
+  $('#confirm-ok').textContent='确认';$('#confirm-cancel').textContent='取消';
+  $('#confirm-title').textContent = title;
+  $('#confirm-msg').innerHTML = msg;
+  confirmCb = cb;
+  confirmOverlay.classList.add('on');
+}
+$('#confirm-cancel').addEventListener('click', ()=>{ confirmOverlay.classList.remove('on'); confirmCb=null; });
+$('#confirm-ok').addEventListener('click', ()=>{
+  confirmOverlay.classList.remove('on');
+  const cb = confirmCb; confirmCb = null;
+  if(cb) cb();
+});
+confirmOverlay.addEventListener('click', (e)=>{ if(e.target===confirmOverlay){ confirmOverlay.classList.remove('on'); confirmCb=null; } });
+
+/* ---------- 设置弹层（重入 / 恢复出厂） ---------- */
+const settingsOverlay = $('#settings-overlay');
+function openSettings(){
+  const cur = STAGES[appState.stage];
+  $('#set-progress').textContent = `第 ${stepNumber()} / ${activeFlow().length} 步 · ${cur.name}`;
+  const doneCnt = FLOW.filter(s=>appState.done[s.id]).length;
+  const skipCnt = FLOW.filter(s=>appState.skip[s.id]).length;
+  $('#set-state').textContent = `完成 ${doneCnt} · 跳过 ${skipCnt}`;
+  settingsOverlay.classList.add('on');
+}
+$('#btn-settings').addEventListener('click', openSettings);
+settingsOverlay.querySelector('[data-close="settings"]').addEventListener('click', ()=> settingsOverlay.classList.remove('on'));
+settingsOverlay.addEventListener('click', (e)=>{ if(e.target===settingsOverlay) settingsOverlay.classList.remove('on'); });
+// 重新进入 OOBE：重置到未完成（从头开始）
+$('#set-restart').addEventListener('click', ()=>{
+  settingsOverlay.classList.remove('on');
+  showConfirm('重新进入 OOBE？', '将清除当前向导进度，从 <b>Stage 0</b> 重新开始。此操作不会清除地图等已保存业务数据。', ()=>{
+    resetState();
+    saveProgress();
+    renderStage();
+    toast('已重新进入 OOBE，从头开始','info');
+  });
+});
+// 恢复出厂设置
+$('#set-factory').addEventListener('click', ()=>{
+  settingsOverlay.classList.remove('on');
+  showConfirm('恢复出厂设置？', '将清除 <b>全部 OOBE 状态与进度</b>（含配网、地图标记状态），机器人回到初始开箱状态。<br><br>⚠️ 此操作不可撤销，业务数据请提前备份。', ()=>{
+    resetState();
+    clearProgress();
+    renderStage();
+    toast('已恢复出厂设置，OOBE 状态重置','warn');
+  });
+});
+function resetState(){
+  robotConnection.reset();
+  appState._diagRunning=false;
+  appState.workMode=null;appState.runScene=null;
+  appState.stage = 13;
+  appState.done = new Array(15).fill(false);
+  appState.skip = new Array(15).fill(false);
+  appState.lang = 'zh';
+  appState.unbox = [false,false,false,false];
+  appState.diag = [false,false,false,false];
+  appState.net = { paired:false, ssid:'', pwd:'', step:0, fallback:false, connected:false };
+  appState.device = { paired:true, logged:true, activated:true };
+  appState.update = { found:false, dl:0, installing:false };
+  appState.scene = null;
+  appState.mapStage = { built:false, edited:false, _from:null };
+  clearInterval(buildTimer);buildTimer=null;MAP.built=false;MAP.saved=false;MAP.build=0;
+  appState.loc = 0;
+  appState.nav = { done:false };
+  appState.safe = { zone:false, speed:false, estop:false, estopPressed:false };
+  appState.golive = { checks:new Array(6).fill(false), steps:new Array(5).fill(false), finished:false, tested:false, _started:false };
+  appState.fin = false;
+}
+/* 退出向导：保存进度 */
+$('#btn-exit').addEventListener('click', ()=>robotConnection.exitGuide());
+
+/* ============================================================
+   模块二：地图管理平台
+   ============================================================ */
+const MAP = {
+  mode: 'view',          // view | build | edit | line | point
+  points: [              // {type,x,y,label}
+    {type:'home',  x:118, y:92,  label:'Home 点'},
+    {type:'pick',  x:560, y:286, label:'取货点'},
+    {type:'place', x:250, y:330, label:'放置点'},
+    {type:'charge',x:80,  y:380, label:'充电点'},
+  ],
+  lines: [               // 禁行线 {x1,y1,x2,y2}
+    {x1:330,y1:40,x2:330,y2:190},
+    {x1:60,y1:210,x2:290,y2:210},
+  ],
+  build: 62,             // 建图进度
+  built: false,
+  saved: false,
+  from: null,            // 从哪个 stage 跳来
+};
+const P_COLOR = {home:'#22d3aa', pick:'#38bdf8', place:'#fbbf24', charge:'#a78bfa'};
+const P_NAME  = {home:'Home 点', pick:'取货点', place:'放置点', charge:'充电点'};
+const TOOLS = [
+  {id:'view',  n:'查看',  ic:ICO.pin,  note:'浏览地图'},
+  {id:'build', n:'建图',  ic:ICO.robot,note:'遥控/自动建图'},
+  {id:'edit',  n:'地图编辑', ic:ICO.map, note:'查看与整理'},
+  {id:'line',  n:'禁行线', ic:ICO.line, note:'点击两点画线'},
+  {id:'point', n:'点位标注', ic:ICO.pin, note:'Home/取货/放置/充电'},
+];
+let lineDraft = null; // {x1,y1,x2,y2}
+
+function renderMapTools(){
+  $('#map-tools').innerHTML = TOOLS.map(t=>{
+    const extra = t.id==='point' ? `
+      <div style="margin:6px 0 2px 24px;display:flex;flex-wrap:wrap;gap:4px">
+        ${Object.keys(P_COLOR).map(k=>`<button class="pt-type ${MAP.ptType===k?'on':''}" data-pt="${k}" style="width:26px;height:26px;border-radius:7px;border:1px solid ${MAP.ptType===k?P_COLOR[k]:'var(--line2)'};background:${MAP.ptType===k?'rgba(34,211,170,.12)':'transparent'};cursor:pointer" title="${P_NAME[k]}"><span style="display:block;width:10px;height:10px;border-radius:50%;background:${P_COLOR[k]};margin:0 auto"></span></button>`).join('')}
+      </div>` : '';
+    return `<button class="map-tool ${MAP.mode===t.id?'on':''}" data-tool="${t.id}">${t.ic}<span>${t.n}</span></button>${extra}`;
+  }).join('');
+  // 工具点击
+  document.querySelectorAll('[data-tool]').forEach(b=>{
+    b.addEventListener('click', ()=>{
+      const id = b.dataset.tool;
+      MAP.mode = id;
+      if(id==='point' && !MAP.ptType) MAP.ptType = 'home';
+      lineDraft = null;
+      renderMap();
+    });
+  });
+  document.querySelectorAll('[data-pt]').forEach(b=>{
+    b.addEventListener('click', ()=>{ MAP.ptType = b.dataset.pt; renderMap(); });
+  });
+}
+function renderMapSide(){
+  const side = $('#map-side');
+  let h = '<div class="side-title">地图信息</div>';
+  h += `<div class="side-row"><span class="k">面积</span><span class="v">142 ㎡</span></div>`;
+  h += `<div class="side-row"><span class="k">障碍物</span><span class="v">12</span></div>`;
+  h += `<div class="side-row ${MAP.built?'ok':'warn'}"><span class="k">建图状态</span><span class="v">${MAP.built?'已建图':'未建图'}</span></div>`;
+  h += `<div class="side-row"><span class="k">定位分</span><span class="v" style="color:var(--accent)">0.96</span></div>`;
+  h += '<div class="side-title" style="margin-top:14px">禁行线</div>';
+  h += `<div class="side-row"><span class="k">线段</span><span class="v">${MAP.lines.length} 条</span></div>`;
+  h += '<div class="side-title" style="margin-top:14px">点位标注</div><div class="point-list">';
+  MAP.points.forEach(p=>{
+    h += `<div class="pt-item"><span class="p-dot" style="background:${P_COLOR[p.type]}"></span><span class="p-name">${P_NAME[p.type]}</span><span class="p-xy">${p.x},${p.y}</span></div>`;
+  });
+  h += '</div>';
+  if(MAP.mode==='build'){
+    h += `<div class="side-title" style="margin-top:14px">建图进度</div>
+      <div class="progress-line"><i style="width:${MAP.build}%"></i></div>
+      <div style="font-size:11px;color:var(--txt3)">${MAP.build}% · 遥控机器人沿墙行走覆盖全场</div>`;
+  }
+  side.innerHTML = h;
+}
+function renderMapCanvas(){
+  const svg = $('#map-svg');
+  let h = '';
+  // 栅格
+  for(let gx=0; gx<=720; gx+=40){
+    h += `<line x1="${gx}" y1="0" x2="${gx}" y2="440" stroke="rgba(120,160,200,.07)" stroke-width="1"/>`;
+  }
+  for(let gy=0; gy<=440; gy+=40){
+    h += `<line x1="0" y1="${gy}" x2="720" y2="${gy}" stroke="rgba(120,160,200,.07)" stroke-width="1"/>`;
+  }
+  // 墙体（地图边界与障碍）
+  h += `<rect x="12" y="12" width="696" height="416" rx="10" fill="rgba(34,211,170,.04)" stroke="rgba(34,211,170,.3)" stroke-width="2" stroke-dasharray="8 5"/>`;
+  // 障碍物（简单方块）
+  const obs = [[140,120,60,40],[430,150,70,46],[560,80,50,40],[90,300,70,40],[480,330,80,44],[620,240,60,42],[250,260,46,40]];
+  obs.forEach(o=>{
+    h += `<rect x="${o[0]}" y="${o[1]}" width="${o[2]}" height="${o[3]}" rx="6" fill="#0f1a2a" stroke="rgba(120,160,200,.35)" stroke-width="1.5"/>`;
+    h += `<line x1="${o[0]+6}" y1="${o[1]+6}" x2="${o[0]+o[2]-6}" y2="${o[1]+o[3]-6}" stroke="rgba(120,160,200,.2)"/><line x1="${o[0]+o[2]-6}" y1="${o[1]+6}" x2="${o[0]+6}" y2="${o[1]+o[3]-6}" stroke="rgba(120,160,200,.2)"/>`;
+  });
+  // 建图模式的"扫描"效果：随进度显示已探索区域
+  if(MAP.mode==='build' && !MAP.built){
+    const w = 696 * MAP.build/100;
+    h += `<rect x="12" y="12" width="${w}" height="416" rx="10" fill="rgba(56,189,248,.05)"/>`;
+    h += `<line x1="${12+w}" y1="12" x2="${12+w}" y2="428" stroke="rgba(56,189,248,.5)" stroke-width="2"/>`;
+    // 机器人位置
+    h += `<g transform="translate(${12+w-20},214)">${robotSvg()}</g>`;
+  }
+  // 禁行线
+  MAP.lines.forEach((l,i)=>{
+    h += `<line x1="${l.x1}" y1="${l.y1}" x2="${l.x2}" y2="${l.y2}" stroke="#f87171" stroke-width="3" stroke-dasharray="10 6" stroke-linecap="round"/>`;
+    h += `<g transform="translate(${(l.x1+l.x2)/2},${(l.y1+l.y2)/2})"><rect x="-26" y="-9" width="52" height="18" rx="9" fill="rgba(248,113,113,.16)" stroke="rgba(248,113,113,.5)" stroke-width="1"/><text x="0" y="4" font-size="10" text-anchor="middle" fill="#f87171">禁行线</text></g>`;
+  });
+  // 禁行线草稿
+  if(lineDraft){
+    h += `<line x1="${lineDraft.x1}" y1="${lineDraft.y1}" x2="${lineDraft.x2||lineDraft.x1}" y2="${lineDraft.y2||lineDraft.y1}" stroke="#f87171" stroke-width="3" stroke-dasharray="10 6" stroke-linecap="round" opacity=".7"/>`;
+  }
+  // 点位
+  MAP.points.forEach(p=>{
+    h += `<g transform="translate(${p.x},${p.y})">
+      <circle r="11" fill="${P_COLOR[p.type]}22" stroke="${P_COLOR[p.type]}" stroke-width="2"/>
+      <circle r="3.5" fill="${P_COLOR[p.type]}"/>
+      <rect x="-30" y="16" width="60" height="17" rx="8" fill="rgba(11,18,32,.85)" stroke="rgba(120,160,200,.25)"/>
+      <text x="0" y="28.5" font-size="10" text-anchor="middle" fill="#e6eef5">${P_NAME[p.type]}</text>
+    </g>`;
+  });
+  svg.innerHTML = h;
+}
+function robotSvg(){
+  return `<svg width="30" height="30" viewBox="0 0 24 24" fill="none"><rect x="4" y="7" width="16" height="11" rx="3" fill="#14202f" stroke="#22d3aa" stroke-width="1.6"/><circle cx="12" cy="4" r="2.2" fill="#14202f" stroke="#22d3aa" stroke-width="1.6"/><circle cx="9" cy="12.5" r="1.2" fill="#22d3aa"/><circle cx="15" cy="12.5" r="1.2" fill="#22d3aa"/><path d="M8 18l-1.5 3M16 18l1.5 3" stroke="#22d3aa" stroke-width="1.6" stroke-linecap="round"/></svg>`;
+}
+function renderMap(){
+  renderMapTools();
+  renderMapSide();
+  renderMapCanvas();
+  // 提示
+  const hint = $('#map-hint');
+  const foot = $('#map-foot-left');
+  const notes = {
+    view:'浏览地图 · 拖动画布查看',
+    build:`遥控建图：沿墙行走覆盖全场 · <b>${MAP.build}%</b>`,
+    edit:'地图已生成 · 可切换到禁行线 / 点位标注',
+    line:'点击地图上<b>两个点</b>绘制禁行线（红色虚线）',
+    point:`点击地图放置 <b>${P_NAME[MAP.ptType||'home']}</b> 标记`,
+  };
+  hint.innerHTML = notes[MAP.mode];
+  hint.style.display = 'block';
+  foot.textContent = '模式：' + TOOLS.find(t=>t.id===MAP.mode).n;
+  $('#chip-map').textContent = MAP.saved ? '已保存' : '未保存';
+}
+/* 地图画布交互 */
+$('#map-canvas').addEventListener('click', (e)=>{
+  const r = e.target.closest('#map-canvas').getBoundingClientRect();
+  // 注意：svg 使用 preserveAspectRatio，坐标需换算
+  const vbW=720, vbH=440, cw=r.width, ch=r.height;
+  const scale = Math.min(cw/vbW, ch/vbH);
+  const offX = (cw - vbW*scale)/2, offY = (ch - vbH*scale)/2;
+  const x = Math.round((e.clientX - r.left - offX)/scale);
+  const y = Math.round((e.clientY - r.top - offY)/scale);
+  if(MAP.mode==='line'){
+    if(!lineDraft){
+      lineDraft = {x1:x, y1:y, x2:x, y2:y};
+    }else{
+      lineDraft.x2 = x; lineDraft.y2 = y;
+      MAP.lines.push({...lineDraft});
+      lineDraft = null;
+      renderMap();
+      toast('禁行线已添加','ok');
+    }
+    renderMap();
+  }else if(MAP.mode==='point'){
+    MAP.points.push({type:MAP.ptType||'home', x, y, label:P_NAME[MAP.ptType||'home']});
+    renderMap();
+    toast(P_NAME[MAP.ptType||'home']+' 已标注','ok');
+  }
+});
+$('#map-canvas').addEventListener('mousemove', (e)=>{
+  if(MAP.mode==='line' && lineDraft){
+    const r = e.target.closest('#map-canvas').getBoundingClientRect();
+    const vbW=720, vbH=440, cw=r.width, ch=r.height;
+    const scale = Math.min(cw/vbW, ch/vbH);
+    const offX = (cw - vbW*scale)/2, offY = (ch - vbH*scale)/2;
+    lineDraft.x2 = Math.round((e.clientX - r.left - offX)/scale);
+    lineDraft.y2 = Math.round((e.clientY - r.top - offY)/scale);
+    renderMapCanvas();
+  }
+});
+/* 建图自动推进 */
+let buildTimer = null;
+function startBuild(){
+  if(buildTimer) return;
+  buildTimer = setInterval(()=>{
+    if(MAP.mode!=='build' && MAP.mode!=='view') { /* 允许后台推进 */ }
+    MAP.build = Math.min(100, MAP.build + 2 + Math.random()*3);
+    renderMap();
+    if(MAP.build>=100){
+      clearInterval(buildTimer); buildTimer=null;
+      MAP.built = true;
+      renderMap();
+      toast('建图完成，地图已生成','ok');
+    }
+  }, 420);
+}
+/* 重置 */
+$('#map-btn-reset').addEventListener('click', ()=>{
+  MAP.points = [{type:'home',x:118,y:92,label:'Home 点'},{type:'pick',x:560,y:286,label:'取货点'},{type:'place',x:250,y:330,label:'放置点'},{type:'charge',x:80,y:380,label:'充电点'}];
+  MAP.lines = [{x1:330,y1:40,x2:330,y2:190},{x1:60,y1:210,x2:290,y2:210}];
+  MAP.build = 62; MAP.built=false; MAP.saved=false; lineDraft=null;
+  renderMap();
+  toast('已重置为示例地图','info');
+});
+/* 保存并返回 */
+$('#map-btn-save').addEventListener('click', ()=>{
+  if(!MAP.built){toast('请先完成建图再保存','warn');return;}
+  MAP.saved = true;
+  renderMap();
+  const from = appState.mapStage._from;
+  // 标记对应阶段完成
+  if(from===7){
+    appState.mapStage.built = true;
+    appState.done[7] = true;
+  }else if(from===8){
+    appState.mapStage.edited = true;
+    appState.done[8] = true;
+  }else{
+    // 无来源：默认完成建图+编辑
+    appState.mapStage.built = true;
+    appState.mapStage.edited = true;
+    appState.done[7] = true;
+    appState.done[8] = true;
+  }
+  switchView('app');
+  toast('地图已保存，返回 OOBE 向导','ok');
+});
+
+/* ---------- 视图切换 ---------- */
+function switchView(name){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('on'));
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));
+  const v = name==='map' ? $('#view-map') : $('#view-app');
+  v.classList.add('on');
+  $('#tab-'+name).classList.add('on');
+  if(name==='map'){
+    renderTrack();$('#map-guide-progress').innerHTML=$('.progress-rail').innerHTML.replace(/ id="[^"]*"/g,'');
+    renderMap();
+    if(MAP.mode==='build' && !MAP.built) startBuild();
+  }else{
+    renderStage();
+  }
+}
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{ switchView(t.dataset.view); });
+});
+
+/* ---------- 启动 ---------- */
+// 恢复上次进度（中途退出 / 再次开机）
+const restored = loadProgress();
+appState.mapStage.detected=false;appState.mapStage.detecting=false;
+MAP.built=!!appState.mapStage.built;
+if(MAP.built)MAP.build=100;
+appState.update.checking=false;
+renderStage();
+if(restored && robotConnection.ready){
+  toast(`已恢复到上次进度：第 ${appState.stage+1} 步 · ${STAGES[appState.stage].name}`, 'info');
+}
+// 自动保存进度：交互后与关闭前
+document.addEventListener('click', ()=>{ setTimeout(saveProgress, 80); });
+document.addEventListener('input', ()=>{ setTimeout(saveProgress, 80); });
+window.addEventListener('beforeunload', ()=>{ saveProgress(); });
+</script>
+</body>
+</html>
